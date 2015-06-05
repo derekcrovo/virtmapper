@@ -8,15 +8,15 @@ import (
 )
 
 type Guest struct {
-	name  string
-	state string
+	Name  string `json:"name"`
+	State string `json:"state"`
 }
 
 type ByName []Guest
 
 func (a ByName) Len() int           { return len(a) }
 func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByName) Less(i, j int) bool { return a[i].name < a[j].name }
+func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
 func ParseVirsh(virshOutput string) map[string][]Guest {
 	guestMap := make(map[string][]Guest)
@@ -43,7 +43,7 @@ func ParseVirsh(virshOutput string) map[string][]Guest {
 func HostFor(hosts map[string][]Guest, guest string) (string, error) {
 	for h, gs := range hosts {
 		for _, g := range gs {
-			if g.name == guest {
+			if g.Name == guest {
 				return h, nil
 			}
 		}
@@ -56,7 +56,7 @@ func Info(hosts map[string][]Guest, system string) string {
 		info := system + " is a virtual host for guests:"
 		sort.Sort(ByName(guests))
 		for i, g := range guests {
-			info += " " + g.name
+			info += " " + g.Name
 			if i != len(guests)-1 {
 				info += ","
 			}

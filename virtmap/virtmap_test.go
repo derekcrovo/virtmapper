@@ -33,7 +33,7 @@ func TestParseVirsh(t *testing.T) {
 	if !exists {
 		t.Error("ParseVirsh didn't find the test host")
 	}
-	if guests[0].name != "nickel" || guests[0].state != "running" {
+	if guests[0].Name != "nickel" || guests[0].State != "running" {
 		t.Error("ParseVirsh returned bad data")
 	}
 	if _, exists := hosts["notme"]; exists {
