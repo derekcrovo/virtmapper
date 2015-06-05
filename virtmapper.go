@@ -11,7 +11,7 @@ import (
 
 const virsh_file = "virsh.txt"
 
-func handleRequest (w http.ResponseWriter, r *http.Request) {
+func handleRequest(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hey %s!", r.URL.Path)
 }
 
@@ -22,7 +22,6 @@ func Serve() {
 
 func main() {
 	log.Printf("Starting")
-//	restserv.Serve()
 
 	v, err := ioutil.ReadFile(virsh_file)
 	if err != nil {

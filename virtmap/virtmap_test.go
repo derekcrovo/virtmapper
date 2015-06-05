@@ -61,7 +61,7 @@ func TestInfo(t *testing.T) {
 	expected := "vhost09 is a virtual host for guests: copper, nickel"
 	if info != expected {
 		t.Error("Info didn't return the expected string:")
-		for _, d := range(difflib.Diff([]string{expected}, []string{info})) {
+		for _, d := range difflib.Diff([]string{expected}, []string{info}) {
 			t.Error(d)
 		}
 	}
