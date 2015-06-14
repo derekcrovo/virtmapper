@@ -21,11 +21,11 @@ kvm30.example.com | FAILED => FAILED: timed out
 `)
 
 func TestParseVirsh(t *testing.T) {
-	hosts := ParseVirsh(virshOutput)
-	if len(hosts) == 0 {
+	nodes := ParseVirsh(virshOutput)
+	if len(nodes) == 0 {
 		t.Fatal("ParseVirsh() returned nothing")
 	}
-	expected := []Host{
+	expected := []Node{
 		{"compute-64", "paused", "kvm43"},
 		{"kvm09", "up", ""},
 		{"kvm30", "down", ""},
@@ -33,90 +33,90 @@ func TestParseVirsh(t *testing.T) {
 		{"olh", "shut", "kvm09"},
 		{"tam", "running", "kvm09"},
 	}
-	if !reflect.DeepEqual(hosts, expected) {
-		t.Fatalf("ParseVirsh() failed.\nGot:\n%v\nExpected:\n%v", hosts, expected)
+	if !reflect.DeepEqual(nodes, expected) {
+		t.Fatalf("ParseVirsh() failed.\nGot:\n%v\nExpected:\n%v", nodes, expected)
 	}
 }
 
 func TestGet(t *testing.T) {
-	hosts := ParseVirsh(virshOutput)
-	host, guests, err := Get(hosts, "kvm43")
-	expected := Host{"kvm43", "up", ""}
+	nodes := ParseVirsh(virshOutput)
+	node, guests, err := Get(nodes, "kvm43")
+	expected := Node{"kvm43", "up", ""}
 	if err != nil {
 		t.Fatalf("Get() returned an error: %s", err.Error())
 	}
-	if !reflect.DeepEqual(host, expected) {
-		t.Fatalf("Get() returned bad host data\nGot:\n%v\nExpected:\n%v", host, expected)
+	if !reflect.DeepEqual(node, expected) {
+		t.Fatalf("Get() returned bad node data\nGot:\n%v\nExpected:\n%v", node, expected)
 	}
-	expectedSlice := []Host{{"compute-64", "paused", "kvm43"}}
+	expectedSlice := []Node{{"compute-64", "paused", "kvm43"}}
 	if !reflect.DeepEqual(guests, expectedSlice) {
 		t.Fatalf("Get() didn't return the correct guests\nGot:\n%v\nExpected:\n%v", guests, expectedSlice)
 	}
-	host, guests, err = Get(hosts, "olh")
-	expected = Host{"olh", "shut", "kvm09"}
+	node, guests, err = Get(nodes, "olh")
+	expected = Node{"olh", "shut", "kvm09"}
 	if err != nil {
 		t.Fatalf("Get() returned an error: %s", err.Error())
 	}
-	if !reflect.DeepEqual(host, expected) {
-		t.Fatalf("Get() returned bad info for test guest\nGot:\n%v\nExpected:\n%v", host, expected)
+	if !reflect.DeepEqual(node, expected) {
+		t.Fatalf("Get() returned bad info for test guest\nGot:\n%v\nExpected:\n%v", node, expected)
 	}
 	if len(guests) != 0 {
 		t.Fatal("Get() returned guests for a guest")
 	}
-	host, guests, err = Get(hosts, "nonsuch")
+	node, guests, err = Get(nodes, "nonsuch")
 	if err == nil {
-		t.Fatal("Get() didn't return an error for a missing host")
+		t.Fatal("Get() didn't return an error for a missing node")
 	}
-	if !reflect.DeepEqual(host, Host{"", "", ""}) {
-		t.Fatal("Get() returned some host data for a missing host")
+	if !reflect.DeepEqual(node, Node{"", "", ""}) {
+		t.Fatal("Get() returned some node data for a missing node")
 	}
 	if len(guests) != 0 {
-		t.Fatal("Get() returned guests for a missing host")
+		t.Fatal("Get() returned guests for a missing node")
 	}
 }
 
-func TestHostFor(t *testing.T) {
-	hosts := ParseVirsh(virshOutput)
-	myhost, err := HostFor(hosts, "missing")
+func TestNodeFor(t *testing.T) {
+	nodes := ParseVirsh(virshOutput)
+	mynode, err := NodeFor(nodes, "missing")
 	if err == nil {
-		t.Fatal("HostFor() didn't error on missing host")
+		t.Fatal("NodeFor() didn't error on missing node")
 	}
-	myhost, err = HostFor(hosts, "compute-64")
+	mynode, err = NodeFor(nodes, "compute-64")
 	if err != nil {
-		t.Fatal("HostFor() didn't find host compute-64")
+		t.Fatal("NodeFor() didn't find node compute-64")
 	}
-	if myhost != "kvm43" {
-		t.Fatal("HostFor() didn't find the test host")
+	if mynode != "kvm43" {
+		t.Fatal("NodeFor() didn't find the test node")
 	}
-	myhost, err = HostFor(hosts, "kvm43")
+	mynode, err = NodeFor(nodes, "kvm43")
 	if err == nil {
-		t.Fatalf("Found host %s for host which isn't virtual", myhost)
+		t.Fatalf("Found node %s for node which isn't virtual", mynode)
 	}
 }
 
 func TestInfo(t *testing.T) {
-	hosts := ParseVirsh(virshOutput)
-	info := Info(hosts, "kvm09")
+	nodes := ParseVirsh(virshOutput)
+	info := Info(nodes, "kvm09")
 	if info == "" {
 		t.Fatal("Info returned nothing")
 	}
-	expected := "kvm09 is a virtual host for guests: olh, tam"
+	expected := "kvm09 is a virtual node for guests: olh, tam"
 	if info != expected {
 		t.Fatalf("Info() problem\nGot:\n%v\nExpected:\n%v", info, expected)
 	}
-	info = Info(hosts, "tam")
+	info = Info(nodes, "tam")
 	if info == "" {
 		t.Fatalf("Info() returned nothing")
 	}
-	expected = "tam is a virtual guest on host: kvm09"
+	expected = "tam is a virtual guest on node: kvm09"
 	if info != expected {
 		t.Fatalf("Info() problem\nGot:\n%v\nExpected:\n%v", info, expected)
 	}
-	info = Info(hosts, "gone")
+	info = Info(nodes, "gone")
 	if info == "" {
 		t.Fatal("Info returned nothing")
 	}
-	expected = "Host gone not found"
+	expected = "Node gone not found"
 	if info != expected {
 		t.Fatalf("Info() problem\nGot:\n%v\nExpected:\n%v", info, expected)
 	}

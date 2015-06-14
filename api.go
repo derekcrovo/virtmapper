@@ -11,21 +11,21 @@ import (
 
 const api_prefix = "/api/v1"
 
-type apiHostResponse struct {
-	Host   virtmap.Host   `json:"host"`
-	Guests []virtmap.Host `json:"guests"`
+type apiNodeResponse struct {
+	Node   virtmap.Node   `json:"node"`
+	Guests []virtmap.Node `json:"guests"`
 }
 
 type apiFullResponse struct {
-	Hosts []virtmap.Host `json:"hosts"`
+	Nodes []virtmap.Node `json:"nodes"`
 }
 
-var GetHosts = func() ([]virtmap.Host, error) { return virtmap.GetHosts(virsh_file) }
+var GetNodes = func() ([]virtmap.Node, error) { return virtmap.GetNodes(virsh_file) }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-	hosts, err := GetHosts()
+	nodes, err := GetNodes()
 	if err != nil {
-		log.Printf("Problem getting hosts: %s", err.Error())
+		log.Printf("Problem getting nodes: %s", err.Error())
 		http.Error(w, `{"error": "Data source error"}`, http.StatusInternalServerError)
 		return
 	}
@@ -34,23 +34,23 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error": "Bad request URL"}`, http.StatusNotFound)
 		return
 	}
-	host := strings.TrimLeft(r.URL.Path[len(api_prefix):], "/")
+	node := strings.TrimLeft(r.URL.Path[len(api_prefix):], "/")
 	var encoded []byte
-	if host == "" {
-		log.Printf("Request for entire map, virtmap: %d hosts", len(hosts))
+	if node == "" {
+		log.Printf("Request for entire map, virtmap: %d nodes", len(nodes))
 		var response apiFullResponse
-		response.Hosts = hosts
+		response.Nodes = nodes
 		encoded, err = json.MarshalIndent(response, " ", "  ")
 		if err != nil {
 			http.Error(w, `{"error": "`+err.Error()+`"}"`, http.StatusInternalServerError)
 			return
 		}
 	} else {
-		log.Printf("Request for %s, virtmap: %d hosts", host, len(hosts))
-		var response apiHostResponse
-		response.Host, response.Guests, err = virtmap.Get(hosts, host)
+		log.Printf("Request for %s, virtmap: %d nodes", node, len(nodes))
+		var response apiNodeResponse
+		response.Node, response.Guests, err = virtmap.Get(nodes, node)
 		if err != nil {
-			encoded = []byte(`{"error": "Host ` + host + ` not found"}`)
+			encoded = []byte(`{"error": "Node ` + node + ` not found"}`)
 		} else {
 			encoded, err = json.MarshalIndent(response, " ", "  ")
 			if err != nil {

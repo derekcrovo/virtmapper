@@ -12,11 +12,11 @@ import (
 )
 
 func TestHandleRequest(t *testing.T) {
-	BadGetHosts := func() ([]virtmap.Host, error) {
-		return []virtmap.Host{{"", "", ""}}, errors.New("GetHosts() error")
+	BadGetNodes := func() ([]virtmap.Node, error) {
+		return []virtmap.Node{{"", "", ""}}, errors.New("GetNodes() error")
 	}
-	GoodGetHosts := func() ([]virtmap.Host, error) {
-		return []virtmap.Host{
+	GoodGetNodes := func() ([]virtmap.Node, error) {
+		return []virtmap.Node{
 			{"compute-64", "paused", "kvm43"},
 			{"kvm09", "up", ""},
 			{"kvm30", "down", ""},
@@ -26,26 +26,26 @@ func TestHandleRequest(t *testing.T) {
 		}, nil
 	}
 
-	full := `{"hosts":[{"name":"compute-64","state":"paused","vhost":"kvm43"},{"name":"kvm09","state":"up","vhost":""},{"name":"kvm30","state":"down","vhost":""},{"name":"kvm43","state":"up","vhost":""},{"name":"olh","state":"shut","vhost":"kvm09"},{"name":"tam","state":"running","vhost":"kvm09"}]}`
+	full := `{"nodes":[{"name":"compute-64","state":"paused","vhost":"kvm43"},{"name":"kvm09","state":"up","vhost":""},{"name":"kvm30","state":"down","vhost":""},{"name":"kvm43","state":"up","vhost":""},{"name":"olh","state":"shut","vhost":"kvm09"},{"name":"tam","state":"running","vhost":"kvm09"}]}`
 
 	tests := []struct {
-		getter func() ([]virtmap.Host, error)
+		getter func() ([]virtmap.Node, error)
 		method string
 		req    string
 		code   int
 		body   string
 	}{
-		{GoodGetHosts, "GET", "/kvm09", http.StatusNotFound, `{"error":"Bad request URL"}`},
-		{GoodGetHosts, "GET", "/api/v1/missinghost", http.StatusOK, `{"error":"Host missinghost not found"}`},
-		{GoodGetHosts, "GET", "/api/v1/kvm09", http.StatusOK, `{"host":{"name":"kvm09","state":"up","vhost":""},"guests":[{"name":"olh","state":"shut","vhost":"kvm09"},{"name":"tam","state":"running","vhost":"kvm09"}]}`},
-		{GoodGetHosts, "GET", "/api/v1/olh", http.StatusOK, `{"host":{"name":"olh","state":"shut","vhost":"kvm09"},"guests":[]}`},
-		{GoodGetHosts, "GET", "/api/v1/", http.StatusOK, full},
-		{GoodGetHosts, "GET", "/api/v1", http.StatusOK, full},
-		{BadGetHosts, "GET", "/api/v1/olh", http.StatusInternalServerError, `{"error":"Data source error"}`},
+		{GoodGetNodes, "GET", "/kvm09", http.StatusNotFound, `{"error":"Bad request URL"}`},
+		{GoodGetNodes, "GET", "/api/v1/missingnode", http.StatusOK, `{"error":"Node missingnode not found"}`},
+		{GoodGetNodes, "GET", "/api/v1/kvm09", http.StatusOK, `{"node":{"name":"kvm09","state":"up","vhost":""},"guests":[{"name":"olh","state":"shut","vhost":"kvm09"},{"name":"tam","state":"running","vhost":"kvm09"}]}`},
+		{GoodGetNodes, "GET", "/api/v1/olh", http.StatusOK, `{"node":{"name":"olh","state":"shut","vhost":"kvm09"},"guests":[]}`},
+		{GoodGetNodes, "GET", "/api/v1/", http.StatusOK, full},
+		{GoodGetNodes, "GET", "/api/v1", http.StatusOK, full},
+		{BadGetNodes, "GET", "/api/v1/olh", http.StatusInternalServerError, `{"error":"Data source error"}`},
 	}
 	buffer := new(bytes.Buffer)
 	for _, test := range tests {
-		GetHosts = test.getter
+		GetNodes = test.getter
 		request, _ := http.NewRequest(test.method, test.req, nil)
 		response := httptest.NewRecorder()
 

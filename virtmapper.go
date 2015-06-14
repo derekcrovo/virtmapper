@@ -42,6 +42,5 @@ func main() {
 
 	if httpServer != "" {
 		Display(Query(query))
-		//		fmt.Printf("Query returned %s", r)
 	}
 }

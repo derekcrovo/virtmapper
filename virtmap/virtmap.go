@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-type Host struct {
+type Node struct {
 	Name  string `json:"name"`
 	State string `json:"state"`
 	VHost string `json:"vhost"`
 }
 
-type ByName []Host
+type ByName []Node
 
 func (a ByName) Len() int           { return len(a) }
 func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
@@ -28,12 +28,12 @@ func ReadVirsh(virshFilename string) ([]byte, error) {
 	return v, nil
 }
 
-func ParseVirsh(virshOutput []byte) []Host {
-	hosts := make([]Host, 0)
-	hostname := ""
+func ParseVirsh(virshOutput []byte) []Node {
+	nodes := make([]Node, 0)
+	nodename := ""
 	for _, line := range strings.Split(string(virshOutput), "\n") {
 		if strings.Contains(line, " | ") {
-			hostname = strings.Split(strings.Fields(line)[0], ".")[0]
+			nodename = strings.Split(strings.Fields(line)[0], ".")[0]
 			if strings.Contains(line, "Name or service not known") {
 				continue
 			}
@@ -41,23 +41,23 @@ func ParseVirsh(virshOutput []byte) []Host {
 			if strings.Contains(line, "FAILED: timed out") {
 				state = "down"
 			}
-			hosts = append(hosts, Host{Name: hostname, State: state, VHost: ""})
+			nodes = append(nodes, Node{Name: nodename, State: state, VHost: ""})
 		}
-		if hostname != "" {
+		if nodename != "" {
 			fields := strings.Fields(line)
 			if len(fields) == 0 {
 				continue
 			}
 			if _, err := strconv.Atoi(fields[0]); err == nil || fields[0] == "-" {
-				hosts = append(hosts, Host{Name: fields[1], State: fields[2], VHost: hostname})
+				nodes = append(nodes, Node{Name: fields[1], State: fields[2], VHost: nodename})
 			}
 		}
 	}
-	sort.Sort(ByName(hosts))
-	return hosts
+	sort.Sort(ByName(nodes))
+	return nodes
 }
 
-func GetHosts(virshFilename string) ([]Host, error) {
+func GetNodes(virshFilename string) ([]Node, error) {
 	raw, err := ReadVirsh(virshFilename)
 	if err != nil {
 		return nil, err
@@ -65,40 +65,40 @@ func GetHosts(virshFilename string) ([]Host, error) {
 	return ParseVirsh(raw), nil
 }
 
-func Get(hosts []Host, target string) (Host, []Host, error) {
-	guests := make([]Host, 0)
-	var host Host
-	for _, h := range hosts {
+func Get(nodes []Node, target string) (Node, []Node, error) {
+	guests := make([]Node, 0)
+	var node Node
+	for _, h := range nodes {
 		if h.Name == target {
-			host = h
+			node = h
 		}
 		if h.VHost == target {
 			guests = append(guests, h)
 		}
 	}
-	if host.Name == "" {
-		return host, guests, errors.New("Host not found")
+	if node.Name == "" {
+		return node, guests, errors.New("Node not found")
 	}
-	return host, guests, nil
+	return node, guests, nil
 }
 
-func HostFor(hosts []Host, target string) (string, error) {
-	for _, h := range hosts {
+func NodeFor(nodes []Node, target string) (string, error) {
+	for _, h := range nodes {
 		if h.Name == target && h.VHost != "" {
 			return h.VHost, nil
 		}
 	}
-	return "", errors.New("Host not found in slice")
+	return "", errors.New("Node not found in slice")
 }
 
-func Info(hosts []Host, target string) string {
-	host, guests, err := Get(hosts, target)
+func Info(nodes []Node, target string) string {
+	node, guests, err := Get(nodes, target)
 	if err != nil {
-		return "Host " + target + " not found"
+		return "Node " + target + " not found"
 	}
 	var info string
 	if len(guests) != 0 {
-		info = host.Name + " is a virtual host for guests:"
+		info = node.Name + " is a virtual node for guests:"
 		sort.Sort(ByName(guests))
 		for i, g := range guests {
 			info += " " + g.Name
@@ -107,7 +107,7 @@ func Info(hosts []Host, target string) string {
 			}
 		}
 	} else {
-		info = target + " is a virtual guest on host: " + host.VHost
+		info = target + " is a virtual guest on node: " + node.VHost
 	}
 	return info
 }
