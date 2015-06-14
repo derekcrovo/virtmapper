@@ -2,43 +2,60 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net/http"
 
 	"github.com/subsonic74/virtmapper/virtmap"
 )
 
+const api_prefix = "/api/v1/"
+
+type apiResponse struct {
+	Host   virtmap.Host   `json:"host"`
+	Guests []virtmap.Host `json:"guests"`
+}
+
+var GetHosts = func() ([]virtmap.Host, error) { return virtmap.GetHosts(virsh_file) }
+
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-	v, err := ioutil.ReadFile(virsh_file)
+	hosts, err := GetHosts()
 	if err != nil {
-		log.Println("Couldn't read file", virsh_file)
-		http.Error(w, "Data source problem", 500)
+		log.Printf("Problem getting hosts: %s", err.Error())
+		http.Error(w, "{'error': 'Data source error'}", http.StatusInternalServerError)
 		return
 	}
-	vmap := virtmap.ParseVirsh(string(v))
-	host := r.URL.Path[len("/api/v1/"):]
-	var response []byte
+	if len(r.URL.Path) < len(api_prefix) {
+		log.Printf("Bad request URL: %s", r.URL.Path)
+		http.Error(w, "{'error': 'Bad request URL'}", http.StatusNotFound)
+	}
+	host := r.URL.Path[len(api_prefix):]
+	var encoded []byte
 	if host == "" {
-		log.Printf("Request for entire map, virtmap: %d hosts", len(vmap))
-		response, err = json.MarshalIndent(&vmap, " ", "  ")
+		log.Printf("Request for entire map, virtmap: %d hosts", len(hosts))
+		var hostmap map[string][]virtmap.Host
+		hostmap["hosts"] = hosts
+		encoded, err = json.MarshalIndent(&hostmap, " ", "  ")
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, "{'error': '"+err.Error()+"'}", http.StatusInternalServerError)
 			return
 		}
 	} else {
-		log.Printf("Request for %s, virtmap: %d hosts", host, len(vmap))
-		single := make(map[string][]virtmap.Guest)
-		single[host] = vmap[host]
-		response, err = json.MarshalIndent(single, " ", "  ")
+		log.Printf("Request for %s, virtmap: %d hosts", host, len(hosts))
+		var response apiResponse
+		response.Host, response.Guests, err = virtmap.Get(hosts, host)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
+			encoded = []byte("{'error': 'Host not found'}")
+		} else {
+			encoded, err = json.MarshalIndent(response, " ", "  ")
+			if err != nil {
+				http.Error(w, "{'error': '"+err.Error()+"'}", http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 	w.Header().Set("Server", "Virtmapper 0.0.1")
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(response)
+	w.Write(encoded)
 }
 
 func Serve() {

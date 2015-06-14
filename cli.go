@@ -9,13 +9,13 @@ import (
 	"github.com/subsonic74/virtmapper/virtmap"
 )
 
-func Query(host string) map[string][]virtmap.Guest {
+func Query(host string) []virtmap.Host {
 	response, err := http.Get("http://" + httpServer + "/api/v1/" + query)
 	if err != nil {
 		fmt.Printf("Get() error, %s\n", err.Error())
 		return nil
 	}
-	var vmap map[string][]virtmap.Guest
+	var vmap []virtmap.Host
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		fmt.Printf("ReadAll() error, %s\n", err.Error())
@@ -29,8 +29,8 @@ func Query(host string) map[string][]virtmap.Guest {
 	return vmap
 }
 
-func Display(vmap map[string][]virtmap.Guest) {
-	for h, _ := range map[string][]virtmap.Guest(vmap) {
-		fmt.Println(virtmap.Info(vmap, h))
+func Display(vmap []virtmap.Host) {
+	for _, h := range vmap {
+		fmt.Println(virtmap.Info(vmap, h.Name))
 	}
 }

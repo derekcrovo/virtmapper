@@ -2,58 +2,103 @@ package virtmap
 
 import (
 	"errors"
+	"io/ioutil"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-type Guest struct {
+type Host struct {
 	Name  string `json:"name"`
 	State string `json:"state"`
+	VHost string `json:"kvm"`
 }
 
-type ByName []Guest
+type ByName []Host
 
 func (a ByName) Len() int           { return len(a) }
 func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
-func ParseVirsh(virshOutput string) map[string][]Guest {
-	guestMap := make(map[string][]Guest)
-	host := ""
-	for _, l := range strings.Split(virshOutput, "\n") {
-		if strings.Contains(l, "success") {
-			host = strings.Split(strings.Fields(l)[0], ".")[0]
-		} else if l == "" {
-			host = ""
+func ReadVirsh(virshFilename string) ([]byte, error) {
+	v, err := ioutil.ReadFile(virshFilename)
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+func ParseVirsh(virshOutput []byte) []Host {
+	hosts := make([]Host, 0)
+	hostname := ""
+	for _, line := range strings.Split(string(virshOutput), "\n") {
+		if strings.Contains(line, " | ") {
+			hostname = strings.Split(strings.Fields(line)[0], ".")[0]
+			if strings.Contains(line, "Name or service not known") {
+				continue
+			}
+			state := "up"
+			if strings.Contains(line, "FAILED: timed out") {
+				state = "down"
+			}
+			hosts = append(hosts, Host{Name: hostname, State: state, VHost: ""})
 		}
-		if host != "" {
-			fields := strings.Fields(l)
+		if hostname != "" {
+			fields := strings.Fields(line)
 			if len(fields) == 0 {
 				continue
 			}
 			if _, err := strconv.Atoi(fields[0]); err == nil || fields[0] == "-" {
-				guestMap[host] = append(guestMap[host], Guest{fields[1], fields[2]})
+				hosts = append(hosts, Host{Name: fields[1], State: fields[2], VHost: hostname})
 			}
 		}
 	}
-	return guestMap
+	sort.Sort(ByName(hosts))
+	return hosts
 }
 
-func HostFor(hosts map[string][]Guest, guest string) (string, error) {
-	for h, gs := range hosts {
-		for _, g := range gs {
-			if g.Name == guest {
-				return h, nil
-			}
+func GetHosts(virshFilename string) ([]Host, error) {
+	raw, err := ReadVirsh(virshFilename)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVirsh(raw), nil
+}
+
+func Get(hosts []Host, target string) (Host, []Host, error) {
+	guests := make([]Host, 0)
+	var host Host
+	for _, h := range hosts {
+		if h.Name == target {
+			host = h
+		}
+		if h.VHost == target {
+			guests = append(guests, h)
 		}
 	}
-	return "", errors.New("Guest not found in map")
+	if host.Name == "" {
+		return host, guests, errors.New("Host not found")
+	}
+	return host, guests, nil
 }
 
-func Info(hosts map[string][]Guest, system string) string {
-	if guests, exists := hosts[system]; exists {
-		info := system + " is a virtual host for guests:"
+func HostFor(hosts []Host, target string) (string, error) {
+	for _, h := range hosts {
+		if h.Name == target && h.VHost != "" {
+			return h.VHost, nil
+		}
+	}
+	return "", errors.New("Host not found in slice")
+}
+
+func Info(hosts []Host, target string) string {
+	host, guests, err := Get(hosts, target)
+	if err != nil {
+		return "Host " + target + " not found"
+	}
+	var info string
+	if len(guests) != 0 {
+		info = host.Name + " is a virtual host for guests:"
 		sort.Sort(ByName(guests))
 		for i, g := range guests {
 			info += " " + g.Name
@@ -61,14 +106,8 @@ func Info(hosts map[string][]Guest, system string) string {
 				info += ","
 			}
 		}
-		return info
 	} else {
-		info := system + " is a virtual guest on host: "
-		host, err := HostFor(hosts, system)
-		if err == nil {
-			info += host
-			return info
-		}
+		info = target + " is a virtual guest on host: " + host.VHost
 	}
-	return system + " is not known"
+	return info
 }

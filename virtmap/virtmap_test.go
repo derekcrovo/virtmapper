@@ -1,68 +1,123 @@
 package virtmap
 
 import (
+	"reflect"
 	"testing"
-
-	"github.com/aryann/difflib"
 )
 
-const virt_output = `vhost09.corp.airwave.com | success | rc=0 >>
+var virshOutput = []byte(`kvm21.example.com | FAILED => FAILED: [Errno -2] Name or service not known
+kvm09.example.com | success | rc=0 >>
  Id    Name                           State
 ----------------------------------------------------
- 4     nickel                         running
- -     copper                         shut off
+ 4     tam                            running
+ -     olh                            shut off
  
- vhost43.corp.airwave.com | success | rc=0 >>
+ kvm43.example.com | success | rc=0 >>
  Id    Name                           State
 ----------------------------------------------------
- 99    amp-integration-64             running
- 100   amp-integration-62             running
- 101   amp-integration-65             running
- 102   amp-integration-63             running
- 128   fr-mb1                         running
- 129   fr-mb2                         running
- 130   fr-mb3                         running
- `
+ 99    compute-64                     paused
+
+kvm30.example.com | FAILED => FAILED: timed out
+`)
 
 func TestParseVirsh(t *testing.T) {
-	hosts := ParseVirsh(virt_output)
+	hosts := ParseVirsh(virshOutput)
 	if len(hosts) == 0 {
-		t.Error("ParseVirsh returned nothing")
+		t.Fatal("ParseVirsh() returned nothing")
 	}
-	guests, exists := hosts["vhost09"]
-	if !exists {
-		t.Error("ParseVirsh didn't find the test host")
+	expected := []Host{
+		{"compute-64", "paused", "kvm43"},
+		{"kvm09", "up", ""},
+		{"kvm30", "down", ""},
+		{"kvm43", "up", ""},
+		{"olh", "shut", "kvm09"},
+		{"tam", "running", "kvm09"},
 	}
-	if guests[0].Name != "nickel" || guests[0].State != "running" {
-		t.Error("ParseVirsh returned bad data")
+	if !reflect.DeepEqual(hosts, expected) {
+		t.Fatalf("ParseVirsh() failed.\nGot:\n%v\nExpected:\n%v", hosts, expected)
 	}
-	if _, exists := hosts["notme"]; exists {
-		t.Error("ParseVirsh found non-existent host")
+}
+
+func TestGet(t *testing.T) {
+	hosts := ParseVirsh(virshOutput)
+	host, guests, err := Get(hosts, "kvm43")
+	expected := Host{"kvm43", "up", ""}
+	if err != nil {
+		t.Fatalf("Get() returned an error: %s", err.Error())
+	}
+	if !reflect.DeepEqual(host, expected) {
+		t.Fatalf("Get() returned bad host data\nGot:\n%v\nExpected:\n%v", host, expected)
+	}
+	expectedSlice := []Host{{"compute-64", "paused", "kvm43"}}
+	if !reflect.DeepEqual(guests, expectedSlice) {
+		t.Fatalf("Get() didn't return the correct guests\nGot:\n%v\nExpected:\n%v", guests, expectedSlice)
+	}
+	host, guests, err = Get(hosts, "olh")
+	expected = Host{"olh", "shut", "kvm09"}
+	if err != nil {
+		t.Fatalf("Get() returned an error: %s", err.Error())
+	}
+	if !reflect.DeepEqual(host, expected) {
+		t.Fatalf("Get() returned bad info for test guest\nGot:\n%v\nExpected:\n%v", host, expected)
+	}
+	if len(guests) != 0 {
+		t.Fatal("Get() returned guests for a guest")
+	}
+	host, guests, err = Get(hosts, "nonsuch")
+	if err == nil {
+		t.Fatal("Get() didn't return an error for a missing host")
+	}
+	if !reflect.DeepEqual(host, Host{"", "", ""}) {
+		t.Fatal("Get() returned some host data for a missing host")
+	}
+	if len(guests) != 0 {
+		t.Fatal("Get() returned guests for a missing host")
 	}
 }
 
 func TestHostFor(t *testing.T) {
-	hosts := ParseVirsh(virt_output)
-	myhost, err := HostFor(hosts, "fr-mb2")
-	if err != nil {
-		t.Error("HostFor didn't find the test host")
+	hosts := ParseVirsh(virshOutput)
+	myhost, err := HostFor(hosts, "missing")
+	if err == nil {
+		t.Fatal("HostFor() didn't error on missing host")
 	}
-	if myhost != "vhost43" {
-		t.Error("HostFor didn't find the test host")
+	myhost, err = HostFor(hosts, "compute-64")
+	if err != nil {
+		t.Fatal("HostFor() didn't find host compute-64")
+	}
+	if myhost != "kvm43" {
+		t.Fatal("HostFor() didn't find the test host")
+	}
+	myhost, err = HostFor(hosts, "kvm43")
+	if err == nil {
+		t.Fatalf("Found host %s for host which isn't virtual", myhost)
 	}
 }
 
 func TestInfo(t *testing.T) {
-	hosts := ParseVirsh(virt_output)
-	info := Info(hosts, "vhost09")
+	hosts := ParseVirsh(virshOutput)
+	info := Info(hosts, "kvm09")
 	if info == "" {
-		t.Error("Info returned nothing")
+		t.Fatal("Info returned nothing")
 	}
-	expected := "vhost09 is a virtual host for guests: copper, nickel"
+	expected := "kvm09 is a virtual host for guests: olh, tam"
 	if info != expected {
-		t.Error("Info didn't return the expected string:")
-		for _, d := range difflib.Diff([]string{expected}, []string{info}) {
-			t.Error(d)
-		}
+		t.Fatalf("Info() problem\nGot:\n%v\nExpected:\n%v", info, expected)
+	}
+	info = Info(hosts, "tam")
+	if info == "" {
+		t.Fatalf("Info() returned nothing")
+	}
+	expected = "tam is a virtual guest on host: kvm09"
+	if info != expected {
+		t.Fatalf("Info() problem\nGot:\n%v\nExpected:\n%v", info, expected)
+	}
+	info = Info(hosts, "gone")
+	if info == "" {
+		t.Fatal("Info returned nothing")
+	}
+	expected = "Host gone not found"
+	if info != expected {
+		t.Fatalf("Info() problem\nGot:\n%v\nExpected:\n%v", info, expected)
 	}
 }
