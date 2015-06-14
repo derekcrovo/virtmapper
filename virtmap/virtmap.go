@@ -11,7 +11,7 @@ import (
 type Host struct {
 	Name  string `json:"name"`
 	State string `json:"state"`
-	VHost string `json:"kvm"`
+	VHost string `json:"vhost"`
 }
 
 type ByName []Host
