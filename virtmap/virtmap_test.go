@@ -21,8 +21,9 @@ kvm30.example.com | FAILED => FAILED: timed out
 `)
 
 func TestParseVirsh(t *testing.T) {
-	nodes := ParseVirsh(virshOutput)
-	if len(nodes) == 0 {
+	var vmap Vmap
+	vmap.ParseVirsh(virshOutput)
+	if len(vmap) == 0 {
 		t.Fatal("ParseVirsh() returned nothing")
 	}
 	expected := []Node{
@@ -33,37 +34,38 @@ func TestParseVirsh(t *testing.T) {
 		{"olh", "shut", "kvm09"},
 		{"tam", "running", "kvm09"},
 	}
-	if !reflect.DeepEqual(nodes, expected) {
-		t.Fatalf("ParseVirsh() failed.\nGot:\n%v\nExpected:\n%v", nodes, expected)
+	if !reflect.DeepEqual(vmap, Vmap(expected)) {
+		t.Fatalf("ParseVirsh() failed.\nGot:\n%v\nExpected:\n%v", vmap, expected)
 	}
 }
 
 func TestGet(t *testing.T) {
-	nodes := ParseVirsh(virshOutput)
-	node, guests, err := Get(nodes, "kvm43")
+	var vmap Vmap
+	vmap.ParseVirsh(virshOutput)
+	node, guests, err := vmap.Get("kvm43")
 	expected := Node{"kvm43", "up", ""}
 	if err != nil {
 		t.Fatalf("Get() returned an error: %s", err.Error())
 	}
 	if !reflect.DeepEqual(node, expected) {
-		t.Fatalf("Get() returned bad node data\nGot:\n%v\nExpected:\n%v", node, expected)
+		t.Fatalf("Get() returned bad node data\nGot:\n%v\nExpected:\n%v", vmap, expected)
 	}
 	expectedSlice := []Node{{"compute-64", "paused", "kvm43"}}
 	if !reflect.DeepEqual(guests, expectedSlice) {
 		t.Fatalf("Get() didn't return the correct guests\nGot:\n%v\nExpected:\n%v", guests, expectedSlice)
 	}
-	node, guests, err = Get(nodes, "olh")
+	node, guests, err = vmap.Get("olh")
 	expected = Node{"olh", "shut", "kvm09"}
 	if err != nil {
 		t.Fatalf("Get() returned an error: %s", err.Error())
 	}
 	if !reflect.DeepEqual(node, expected) {
-		t.Fatalf("Get() returned bad info for test guest\nGot:\n%v\nExpected:\n%v", node, expected)
+		t.Fatalf("Get() returned bad info for test guest\nGot:\n%v\nExpected:\n%v", vmap, expected)
 	}
 	if len(guests) != 0 {
 		t.Fatal("Get() returned guests for a guest")
 	}
-	node, guests, err = Get(nodes, "nonsuch")
+	node, guests, err = vmap.Get("nonsuch")
 	if err == nil {
 		t.Fatal("Get() didn't return an error for a missing node")
 	}
@@ -75,28 +77,27 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestNodeFor(t *testing.T) {
-	nodes := ParseVirsh(virshOutput)
-	mynode, err := NodeFor(nodes, "missing")
+func TestVhostFor(t *testing.T) {
+	var vmap Vmap
+	vmap.ParseVirsh(virshOutput)
+	mynode, err := vmap.VhostFor("missing")
 	if err == nil {
-		t.Fatal("NodeFor() didn't error on missing node")
+		t.Fatal("VhostFor() didn't error on missing node")
 	}
-	mynode, err = NodeFor(nodes, "compute-64")
+	mynode, err = vmap.VhostFor("compute-64")
 	if err != nil {
-		t.Fatal("NodeFor() didn't find node compute-64")
+		t.Fatal("VhostFor() didn't find node compute-64")
 	}
-	if mynode != "kvm43" {
-		t.Fatal("NodeFor() didn't find the test node")
-	}
-	mynode, err = NodeFor(nodes, "kvm43")
+	mynode, err = vmap.VhostFor("kvm43")
 	if err == nil {
-		t.Fatalf("Found node %s for node which isn't virtual", mynode)
+		t.Fatalf("Found vhost %s for node which isn't virtual", mynode)
 	}
 }
 
 func TestInfo(t *testing.T) {
-	nodes := ParseVirsh(virshOutput)
-	info := Info(nodes, "kvm09")
+	var vmap Vmap
+	vmap.ParseVirsh(virshOutput)
+	info := vmap.Info("kvm09")
 	if info == "" {
 		t.Fatal("Info returned nothing")
 	}
@@ -104,7 +105,7 @@ func TestInfo(t *testing.T) {
 	if info != expected {
 		t.Fatalf("Info() problem\nGot:\n%v\nExpected:\n%v", info, expected)
 	}
-	info = Info(nodes, "tam")
+	info = vmap.Info("tam")
 	if info == "" {
 		t.Fatalf("Info() returned nothing")
 	}
@@ -112,7 +113,7 @@ func TestInfo(t *testing.T) {
 	if info != expected {
 		t.Fatalf("Info() problem\nGot:\n%v\nExpected:\n%v", info, expected)
 	}
-	info = Info(nodes, "gone")
+	info = vmap.Info("gone")
 	if info == "" {
 		t.Fatal("Info returned nothing")
 	}

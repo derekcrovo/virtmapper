@@ -14,22 +14,13 @@ type Node struct {
 	VHost string `json:"vhost"`
 }
 
-type ByName []Node
+type Vmap []Node
 
-func (a ByName) Len() int           { return len(a) }
-func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+func (a Vmap) Len() int           { return len(a) }
+func (a Vmap) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a Vmap) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
-func ReadVirsh(virshFilename string) ([]byte, error) {
-	v, err := ioutil.ReadFile(virshFilename)
-	if err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-func ParseVirsh(virshOutput []byte) []Node {
-	nodes := make([]Node, 0)
+func (v *Vmap) ParseVirsh(virshOutput []byte) {
 	nodename := ""
 	for _, line := range strings.Split(string(virshOutput), "\n") {
 		if strings.Contains(line, " | ") {
@@ -41,7 +32,7 @@ func ParseVirsh(virshOutput []byte) []Node {
 			if strings.Contains(line, "FAILED: timed out") {
 				state = "down"
 			}
-			nodes = append(nodes, Node{Name: nodename, State: state, VHost: ""})
+			*v = append(*v, Node{Name: nodename, State: state, VHost: ""})
 		}
 		if nodename != "" {
 			fields := strings.Fields(line)
@@ -49,26 +40,26 @@ func ParseVirsh(virshOutput []byte) []Node {
 				continue
 			}
 			if _, err := strconv.Atoi(fields[0]); err == nil || fields[0] == "-" {
-				nodes = append(nodes, Node{Name: fields[1], State: fields[2], VHost: nodename})
+				*v = append(*v, Node{Name: fields[1], State: fields[2], VHost: nodename})
 			}
 		}
 	}
-	sort.Sort(ByName(nodes))
-	return nodes
+	sort.Sort(Vmap(*v))
 }
 
-func GetNodes(virshFilename string) ([]Node, error) {
-	raw, err := ReadVirsh(virshFilename)
+func (v *Vmap) Load(virshFilename string) error {
+	raw, err := ioutil.ReadFile(virshFilename)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return ParseVirsh(raw), nil
+	v.ParseVirsh(raw)
+	return nil
 }
 
-func Get(nodes []Node, target string) (Node, []Node, error) {
-	guests := make([]Node, 0)
+func (v Vmap) Get(target string) (Node, []Node, error) {
 	var node Node
-	for _, h := range nodes {
+	guests := make([]Node, 0)
+	for _, h := range v {
 		if h.Name == target {
 			node = h
 		}
@@ -82,24 +73,24 @@ func Get(nodes []Node, target string) (Node, []Node, error) {
 	return node, guests, nil
 }
 
-func NodeFor(nodes []Node, target string) (string, error) {
-	for _, h := range nodes {
+func (v Vmap) VhostFor(target string) (Node, error) {
+	for _, h := range v {
 		if h.Name == target && h.VHost != "" {
-			return h.VHost, nil
+			return h, nil
 		}
 	}
-	return "", errors.New("Node not found in slice")
+	return Node{}, errors.New("Node not found in slice")
 }
 
-func Info(nodes []Node, target string) string {
-	node, guests, err := Get(nodes, target)
+func (v Vmap) Info(target string) string {
+	node, guests, err := v.Get(target)
 	if err != nil {
 		return "Node " + target + " not found"
 	}
 	var info string
 	if len(guests) != 0 {
 		info = node.Name + " is a virtual node for guests:"
-		sort.Sort(ByName(guests))
+		sort.Sort(Vmap(guests))
 		for i, g := range guests {
 			info += " " + g.Name
 			if i != len(guests)-1 {

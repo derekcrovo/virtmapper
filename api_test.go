@@ -12,11 +12,11 @@ import (
 )
 
 func TestHandleRequest(t *testing.T) {
-	BadGetNodes := func() ([]virtmap.Node, error) {
-		return []virtmap.Node{{"", "", ""}}, errors.New("GetNodes() error")
+	BadGetNodes := func() (virtmap.Vmap, error) {
+		return []virtmap.Node{{}}, errors.New("GetNodes() error")
 	}
-	GoodGetNodes := func() ([]virtmap.Node, error) {
-		return []virtmap.Node{
+	GoodGetNodes := func() (virtmap.Vmap, error) {
+		return virtmap.Vmap{
 			{"compute-64", "paused", "kvm43"},
 			{"kvm09", "up", ""},
 			{"kvm30", "down", ""},
@@ -26,10 +26,10 @@ func TestHandleRequest(t *testing.T) {
 		}, nil
 	}
 
-	full := `{"nodes":[{"name":"compute-64","state":"paused","vhost":"kvm43"},{"name":"kvm09","state":"up","vhost":""},{"name":"kvm30","state":"down","vhost":""},{"name":"kvm43","state":"up","vhost":""},{"name":"olh","state":"shut","vhost":"kvm09"},{"name":"tam","state":"running","vhost":"kvm09"}]}`
+	full := `{"vmap":[{"name":"compute-64","state":"paused","vhost":"kvm43"},{"name":"kvm09","state":"up","vhost":""},{"name":"kvm30","state":"down","vhost":""},{"name":"kvm43","state":"up","vhost":""},{"name":"olh","state":"shut","vhost":"kvm09"},{"name":"tam","state":"running","vhost":"kvm09"}]}`
 
 	tests := []struct {
-		getter func() ([]virtmap.Node, error)
+		getter func() (virtmap.Vmap, error)
 		method string
 		req    string
 		code   int
