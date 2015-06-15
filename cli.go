@@ -21,6 +21,7 @@ func Query(node string) virtmap.Vmap {
 		fmt.Printf("ReadAll() error, %s\n", err.Error())
 		return nil
 	}
+	fmt.Println("Unmarshal", string(body))
 	err = json.Unmarshal(body, &vmap)
 	if err != nil {
 		fmt.Printf("Unmarshal() error, %s\n", err.Error())

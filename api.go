@@ -44,7 +44,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	node := strings.TrimLeft(r.URL.Path[len(api_prefix):], "/")
 	var encoded []byte
 	if node == "" {
-		log.Printf("Request for entire map, virtmap: %d vmap", len(vmap))
+		log.Printf("Request for entire map, virtmap: %d nodes", len(vmap))
 		var response apiFullResponse
 		response.Nodes = vmap
 		encoded, err = json.MarshalIndent(response, " ", "  ")
@@ -53,7 +53,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		log.Printf("Request for %s, virtmap: %d vmap", node, len(vmap))
+		log.Printf("Request for %s, virtmap: %d nodes", node, len(vmap))
 		var response apiNodeResponse
 		response.Node, response.Guests, err = vmap.Get(node)
 		if err != nil {
