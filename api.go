@@ -57,7 +57,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		var response apiNodeResponse
 		response.Node, response.Guests, err = vmap.Get(node)
 		if err != nil {
-			encoded = []byte(`{"error": "Node ` + node + ` not found"}`)
+			encoded = []byte(`{"error": "node ` + node + ` not found"}`)
 		} else {
 			encoded, err = json.MarshalIndent(response, " ", "  ")
 			if err != nil {

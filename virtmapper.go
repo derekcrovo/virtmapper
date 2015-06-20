@@ -41,6 +41,11 @@ func main() {
 	}
 
 	if httpServer != "" {
-		Display(Query(query))
+		result, err := Query(query)
+		if err != nil {
+			fmt.Printf("Error, %v", err)
+			os.Exit(1)
+		}
+		Display(result)
 	}
 }
