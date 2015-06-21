@@ -88,7 +88,7 @@ func (v Vmap) Info(target string) string {
 		return "Node " + target + " not found"
 	}
 	var info string
-	if len(guests) != 0 {
+	if node.VHost == "" {
 		info = node.Name + " is a virtual host for guests:"
 		sort.Sort(Vmap(guests))
 		for i, g := range guests {
