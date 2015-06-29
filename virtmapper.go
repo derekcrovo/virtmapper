@@ -7,7 +7,7 @@ import (
 )
 
 const Version = "0.0.1"
-const virsh_file = "/tmp/virsh.txt"
+const virsh_file = "/Users/derek/virsh.txt"
 
 var (
 	httpAddr     string

@@ -13,20 +13,26 @@ import (
 
 func TestHandleRequest(t *testing.T) {
 	BadGetNodes := func() (virtmap.Vmap, error) {
-		return []virtmap.Node{{}}, errors.New("GetNodes() error")
+		return virtmap.Vmap{}, errors.New("GetNodes() error")
 	}
 	GoodGetNodes := func() (virtmap.Vmap, error) {
 		return virtmap.Vmap{
-			{"compute-64", "paused", "kvm43"},
-			{"kvm09", "up", ""},
-			{"kvm30", "down", ""},
-			{"kvm43", "up", ""},
-			{"olh", "shut", "kvm09"},
-			{"tam", "running", "kvm09"},
-		}, nil
+				map[string]virtmap.VHost{
+					"kvm09": virtmap.VHost{"up", []string{"olh", "tam"}},
+					"kvm43": virtmap.VHost{"up", []string{"compute-64"}},
+					"kvm30": virtmap.VHost{"down", []string(nil)},
+					"kvm59": virtmap.VHost{"up", []string(nil)},
+				},
+				map[string]virtmap.VGuest{
+					"tam":        virtmap.VGuest{"running", "kvm09"},
+					"olh":        virtmap.VGuest{"shut", "kvm09"},
+					"compute-64": virtmap.VGuest{"paused", "kvm43"},
+				},
+			},
+			nil
 	}
 
-	full := `{"vmap":[{"name":"compute-64","state":"paused","vhost":"kvm43"},{"name":"kvm09","state":"up","vhost":""},{"name":"kvm30","state":"down","vhost":""},{"name":"kvm43","state":"up","vhost":""},{"name":"olh","state":"shut","vhost":"kvm09"},{"name":"tam","state":"running","vhost":"kvm09"}]}`
+	full := `{"hosts":{"kvm09":{"state":"up","guests":["olh","tam"]},"kvm30":{"state":"down","guests":null},"kvm43":{"state":"up","guests":["compute-64"]},"kvm59":{"state":"up","guests":null}},"guests":{"compute-64":{"state":"paused","host":"kvm43"},"olh":{"state":"shut","host":"kvm09"},"tam":{"state":"running","host":"kvm09"}}}`
 
 	tests := []struct {
 		getter func() (virtmap.Vmap, error)
@@ -37,8 +43,8 @@ func TestHandleRequest(t *testing.T) {
 	}{
 		{GoodGetNodes, "GET", "/kvm09", http.StatusNotFound, `{"error":"Bad request URL"}`},
 		{GoodGetNodes, "GET", "/api/v1/missingnode", http.StatusOK, `{"error":"Node missingnode not found"}`},
-		{GoodGetNodes, "GET", "/api/v1/kvm09", http.StatusOK, `{"node":{"name":"kvm09","state":"up","vhost":""},"guests":[{"name":"olh","state":"shut","vhost":"kvm09"},{"name":"tam","state":"running","vhost":"kvm09"}]}`},
-		{GoodGetNodes, "GET", "/api/v1/olh", http.StatusOK, `{"node":{"name":"olh","state":"shut","vhost":"kvm09"},"guests":[]}`},
+		{GoodGetNodes, "GET", "/api/v1/kvm09", http.StatusOK, `{"hosts":{"kvm09":{"state":"up","guests":["olh","tam"]}},"guests":null}`},
+		{GoodGetNodes, "GET", "/api/v1/olh", http.StatusOK, `{"hosts":null,"guests":{"olh":{"state":"shut","host":"kvm09"}}}`},
 		{GoodGetNodes, "GET", "/api/v1/", http.StatusOK, full},
 		{GoodGetNodes, "GET", "/api/v1", http.StatusOK, full},
 		{BadGetNodes, "GET", "/api/v1/olh", http.StatusInternalServerError, `{"error":"Data source error"}`},
@@ -56,10 +62,10 @@ func TestHandleRequest(t *testing.T) {
 		}
 		err := json.Compact(buffer, response.Body.Bytes())
 		if err != nil {
-			t.Fatalf("JSON Compact() error: %v\n%v", err, response.Body)
+			t.Fatalf("JSON Compact() error: %v\n%v\nOn request for: %v\n", err, response.Body, test.req)
 		}
 		if buffer.String() != test.body {
-			t.Fatalf("Incorrect API response\nGot:\n%v\nExpected:\n%v", buffer.String(), test.body)
+			t.Fatalf("Incorrect API response\nGot:\n%v\nExpected:\n%v\nOn request for: %s", buffer.String(), test.body, test.req)
 		}
 		buffer.Reset()
 	}

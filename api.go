@@ -11,15 +11,6 @@ import (
 
 const api_prefix = "/api/v1"
 
-type apiNodeResponse struct {
-	Node   virtmap.Node   `json:"node"`
-	Guests []virtmap.Node `json:"guests"`
-}
-
-type apiFullResponse struct {
-	Nodes []virtmap.Node `json:"vmap"`
-}
-
 var GetNodes = func() (virtmap.Vmap, error) {
 	var vmap virtmap.Vmap
 	err := vmap.Load(virsh_file)
@@ -42,31 +33,27 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	node := strings.TrimLeft(r.URL.Path[len(api_prefix):], "/")
+
 	var encoded []byte
+
 	if node == "" {
-		log.Printf("Request for entire map, virtmap: %d nodes", len(vmap))
-		var response apiFullResponse
-		response.Nodes = vmap
-		encoded, err = json.MarshalIndent(response, " ", "  ")
-		if err != nil {
-			http.Error(w, `{"error": "`+err.Error()+`"}"`, http.StatusInternalServerError)
-			return
-		}
+		log.Printf("Request for entire map, virtmap: %d nodes", vmap.Length())
+		encoded, err = json.MarshalIndent(vmap, " ", "  ")
 	} else {
-		log.Printf("Request for %s, virtmap: %d nodes", node, len(vmap))
-		var response apiNodeResponse
-		response.Node, response.Guests, err = vmap.Get(node)
+		log.Printf("Request for %s, virtmap: %d nodes", node, vmap.Length())
+		response, err := vmap.Get(node)
 		if err != nil {
 			encoded = []byte(`{"error": "Node ` + node + ` not found"}`)
 		} else {
 			encoded, err = json.MarshalIndent(response, " ", "  ")
-			if err != nil {
-				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
-				return
-			}
 		}
 	}
-	w.Header().Set("Server", "Virtmapper 0.0.1")
+	if err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}"`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Server", "Virtmapper 0.0.2")
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(encoded)
 }

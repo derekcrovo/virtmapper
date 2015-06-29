@@ -2,27 +2,38 @@ package virtmap
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-type Node struct {
-	Name  string `json:"name"`
-	State string `json:"state"`
-	VHost string `json:"vhost"`
+type VHost struct {
+	State  string   `json:"state"`
+	Guests []string `json:"guests"`
 }
 
-type Vmap []Node
+type VGuest struct {
+	State string `json:"state"`
+	Host  string `json:"host"`
+}
 
-func (a Vmap) Len() int           { return len(a) }
-func (a Vmap) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a Vmap) Less(i, j int) bool { return a[i].Name < a[j].Name }
+type Vmap struct {
+	Hosts  map[string]VHost  `json:"hosts"`
+	Guests map[string]VGuest `json:"guests"`
+}
+
+func (v Vmap) Length() int {
+	return len(v.Hosts) + len(v.Guests)
+}
 
 func (v *Vmap) ParseVirsh(virshOutput []byte) {
+	v.Hosts = make(map[string]VHost)
+	v.Guests = make(map[string]VGuest)
 	nodename := ""
 	for _, line := range strings.Split(string(virshOutput), "\n") {
+		// Ansible status lines contain the hostname and any connection errors
 		if strings.Contains(line, " | ") {
 			nodename = strings.Split(strings.Fields(line)[0], ".")[0]
 			if strings.Contains(line, "Name or service not known") {
@@ -32,19 +43,25 @@ func (v *Vmap) ParseVirsh(virshOutput []byte) {
 			if strings.Contains(line, "FAILED: timed out") {
 				state = "down"
 			}
-			*v = append(*v, Node{Name: nodename, State: state, VHost: ""})
+			v.Hosts[nodename] = VHost{State: state}
 		}
 		if nodename != "" {
 			fields := strings.Fields(line)
 			if len(fields) == 0 {
 				continue
 			}
+			// Guest state lines
 			if _, err := strconv.Atoi(fields[0]); err == nil || fields[0] == "-" {
-				*v = append(*v, Node{Name: fields[1], State: fields[2], VHost: nodename})
+				host := v.Hosts[nodename]
+				host.Guests = append(host.Guests, fields[1])
+				v.Hosts[nodename] = host
+				v.Guests[fields[1]] = VGuest{State: fields[2], Host: nodename}
 			}
 		}
 	}
-	sort.Sort(Vmap(*v))
+	for _, h := range v.Hosts {
+		sort.Strings(h.Guests)
+	}
 }
 
 func (v *Vmap) Load(virshFilename string) error {
@@ -56,49 +73,40 @@ func (v *Vmap) Load(virshFilename string) error {
 	return nil
 }
 
-func (v Vmap) Get(target string) (Node, []Node, error) {
-	var node Node
-	guests := make([]Node, 0)
-	for _, h := range v {
-		if h.Name == target {
-			node = h
-		}
-		if h.VHost == target {
-			guests = append(guests, h)
-		}
-	}
-	if node.Name == "" {
-		return node, guests, errors.New("Node not found")
-	}
-	return node, guests, nil
-}
-
-func (v Vmap) VhostFor(target string) (Node, error) {
-	for _, h := range v {
-		if h.Name == target && h.VHost != "" {
-			return h, nil
+func (v Vmap) Get(target string) (Vmap, error) {
+	var result Vmap
+	found := false
+	for n, h := range v.Hosts {
+		if n == target {
+			result.Hosts = make(map[string]VHost)
+			result.Hosts[n] = h
+			found = true
 		}
 	}
-	return Node{}, errors.New("Node not found in slice")
+	for n, g := range v.Guests {
+		if n == target {
+			result.Guests = make(map[string]VGuest)
+			result.Guests[n] = g
+			found = true
+		}
+	}
+	if !found {
+		return result, errors.New("Node not found")
+	}
+	return result, nil
 }
 
 func (v Vmap) Info(target string) string {
-	node, guests, err := v.Get(target)
+	result, err := v.Get(target)
 	if err != nil {
-		return "Node " + target + " not found"
+		return fmt.Sprintf("Node %s not found", target)
 	}
 	var info string
-	if node.VHost == "" {
-		info = node.Name + " is a virtual host for guests:"
-		sort.Sort(Vmap(guests))
-		for i, g := range guests {
-			info += " " + g.Name
-			if i != len(guests)-1 {
-				info += ","
-			}
-		}
-	} else {
-		info = target + " is a virtual guest on host: " + node.VHost
+	if h, isHost := result.Hosts[target]; isHost {
+		info = fmt.Sprintf("%s is a virtual host for guests: %s", target, strings.Join(h.Guests, ", "))
+	}
+	if g, isGuest := result.Guests[target]; isGuest {
+		info = fmt.Sprintf("%s is a virtual guest on host: %s", target, g.Host)
 	}
 	return info
 }
