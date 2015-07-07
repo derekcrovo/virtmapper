@@ -5,28 +5,14 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/subsonic74/virtmapper/virtmap"
 )
 
 const api_prefix = "/api/v1"
 
-var GetNodes = func() (virtmap.Vmap, error) {
-	var vmap virtmap.Vmap
-	err := vmap.Load(virsh_file)
-	if err != nil {
-		return vmap, err
-	}
-	return vmap, nil
-}
-
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-	vmap, err := GetNodes()
-	if err != nil {
-		log.Printf("Problem getting vmap: %s", err.Error())
-		http.Error(w, `{"error": "Data source error"}`, http.StatusInternalServerError)
-		return
-	}
 	if len(r.URL.Path) < len(api_prefix) {
 		log.Printf("Bad request URL: %s", r.URL.Path)
 		http.Error(w, `{"error": "Bad request URL"}`, http.StatusNotFound)
@@ -35,7 +21,14 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	node := strings.TrimLeft(r.URL.Path[len(api_prefix):], "/")
 
 	var encoded []byte
+	var err error
 
+	vmap := safeVmap.Get()
+	if vmap.Length() == 0 {
+		log.Printf("Vmap empty!")
+		http.Error(w, `{"error": "Data source error"}`, http.StatusInternalServerError)
+		return
+	}
 	if node == "" {
 		log.Printf("Request for entire map, virtmap: %d nodes", vmap.Length())
 		encoded, err = json.MarshalIndent(vmap, " ", "  ")
@@ -53,13 +46,26 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Server", "Virtmapper 0.0.2")
+	w.Header().Set("Server", "Virtmapper 0.0.3")
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(encoded)
 }
 
+func Reloader() {
+	var vmap virtmap.Vmap
+	for ;; {
+		log.Printf("Reloading from %s\n", virsh_file)
+		err := vmap.Load(virsh_file)
+		if err != nil {
+			log.Printf("Problem getting vmap: %s", err.Error())
+		}
+		safeVmap.Set(vmap)
+		time.Sleep(refresh_rate)
+	}
+}
+
 func Serve() {
 	http.HandleFunc("/api/v1/", handleRequest)
-	log.Println("Started")
+	log.Println("Starting")
 	log.Fatal(http.ListenAndServe(httpAddr, nil))
 }

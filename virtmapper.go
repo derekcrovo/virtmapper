@@ -4,10 +4,23 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sync"
+	"time"
+
+	"github.com/subsonic74/virtmapper/virtmap"
 )
 
-const Version = "0.0.1"
-const virsh_file = "/Users/derek/virsh.txt"
+const Version = "0.0.2"
+const virsh_file = "/tmp/virsh.txt"
+
+type SafeVmap struct {
+	vmap   virtmap.Vmap
+	rwlock sync.RWMutex
+}
+
+var safeVmap SafeVmap
+
+const refresh_rate = 60 * time.Minute
 
 var (
 	httpAddr     string
@@ -15,6 +28,18 @@ var (
 	query        string
 	printVersion bool
 )
+
+func (s *SafeVmap) Get() virtmap.Vmap {
+	s.rwlock.RLock()
+	defer s.rwlock.RUnlock()
+	return s.vmap
+}
+
+func (s *SafeVmap) Set(v virtmap.Vmap) {
+	s.rwlock.Lock()
+	defer s.rwlock.Unlock()
+	s.vmap = v
+}
 
 func init() {
 	flag.StringVar(&httpAddr, "http", "", "HTTP service address (e.g., ':6060')")
@@ -37,6 +62,7 @@ func main() {
 	}
 
 	if httpAddr != "" {
+		go Reloader()
 		Serve()
 	}
 
