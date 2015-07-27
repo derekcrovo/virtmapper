@@ -6,37 +6,35 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-
-	"github.com/subsonic74/virtmapper/virtmap"
 )
 
 var HTTPGetter = func(url string) (*http.Response, error) {
 	return http.Get(url)
 }
 
-func Query(query string) (virtmap.Vmap, error) {
+func Query(query string) (Vmap, error) {
 	response, err := HTTPGetter("http://" + httpServer + "/api/v1/" + query)
 	if err != nil {
 		fmt.Printf("Get() error, %v\n", err)
-		return virtmap.Vmap{}, err
+		return Vmap{}, err
 	}
 
-	var vmap virtmap.Vmap
+	var vmap Vmap
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		fmt.Printf("ReadAll() error, %v\n", err)
-		return virtmap.Vmap{}, err
+		return Vmap{}, err
 	}
 
 	var genericReply map[string]interface{}
 	err = json.Unmarshal(body, &genericReply)
 	if err != nil {
 		fmt.Printf("JSON Unmarshalling error: %v", err)
-		return virtmap.Vmap{}, err
+		return Vmap{}, err
 	}
 
 	if data, isQueryError := genericReply["error"]; isQueryError {
-		return virtmap.Vmap{}, errors.New(data.(string) + "\n")
+		return Vmap{}, errors.New(data.(string) + "\n")
 	} else {
 		err = json.Unmarshal(body, &vmap)
 	}
@@ -48,7 +46,7 @@ func Query(query string) (virtmap.Vmap, error) {
 	return vmap, nil
 }
 
-func Display(vmap virtmap.Vmap) {
+func Display(vmap Vmap) {
 	for n, _ := range vmap.Hosts {
 		fmt.Println(vmap.Info(n))
 	}

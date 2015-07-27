@@ -1,4 +1,4 @@
-package virtmap
+package main
 
 import (
 	"reflect"

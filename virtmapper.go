@@ -6,15 +6,13 @@ import (
 	"os"
 	"sync"
 	"time"
-
-	"github.com/subsonic74/virtmapper/virtmap"
 )
 
 const Version = "0.0.2"
 const virsh_file = "/tmp/virsh.txt"
 
 type SafeVmap struct {
-	vmap   virtmap.Vmap
+	vmap   Vmap
 	rwlock sync.RWMutex
 }
 
@@ -29,13 +27,13 @@ var (
 	printVersion bool
 )
 
-func (s *SafeVmap) Get() virtmap.Vmap {
+func (s *SafeVmap) Get() Vmap {
 	s.rwlock.RLock()
 	defer s.rwlock.RUnlock()
 	return s.vmap
 }
 
-func (s *SafeVmap) Set(v virtmap.Vmap) {
+func (s *SafeVmap) Set(v Vmap) {
 	s.rwlock.Lock()
 	defer s.rwlock.Unlock()
 	s.vmap = v

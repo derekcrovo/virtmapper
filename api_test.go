@@ -6,22 +6,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/subsonic74/virtmapper/virtmap"
 )
 
 func TestHandleRequest(t *testing.T) {
-    vmap := virtmap.Vmap{
-        map[string]virtmap.VHost{
-            "kvm09": virtmap.VHost{"up", []string{"olh", "tam"}},
-            "kvm43": virtmap.VHost{"up", []string{"compute-64"}},
-            "kvm30": virtmap.VHost{"down", []string(nil)},
-            "kvm59": virtmap.VHost{"up", []string(nil)},
+    vmap := Vmap{
+        map[string]VHost{
+            "kvm09": VHost{"up", []string{"olh", "tam"}},
+            "kvm43": VHost{"up", []string{"compute-64"}},
+            "kvm30": VHost{"down", []string(nil)},
+            "kvm59": VHost{"up", []string(nil)},
         },
-        map[string]virtmap.VGuest{
-            "tam":        virtmap.VGuest{"running", "kvm09"},
-            "olh":        virtmap.VGuest{"shut", "kvm09"},
-            "compute-64": virtmap.VGuest{"paused", "kvm43"},
+        map[string]VGuest{
+            "tam":        VGuest{"running", "kvm09"},
+            "olh":        VGuest{"shut", "kvm09"},
+            "compute-64": VGuest{"paused", "kvm43"},
         },
     }
 	full := `{"hosts":{"kvm09":{"state":"up","guests":["olh","tam"]},"kvm30":{"state":"down","guests":null},"kvm43":{"state":"up","guests":["compute-64"]},"kvm59":{"state":"up","guests":null}},"guests":{"compute-64":{"state":"paused","host":"kvm43"},"olh":{"state":"shut","host":"kvm09"},"tam":{"state":"running","host":"kvm09"}}}`
@@ -47,7 +45,7 @@ func TestHandleRequest(t *testing.T) {
 		response := httptest.NewRecorder()
 
         if test.empty {
-            safeVmap.Set(virtmap.Vmap{})
+            safeVmap.Set(Vmap{})
         } else {
             safeVmap.Set(vmap)
         }

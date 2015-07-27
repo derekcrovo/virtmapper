@@ -6,13 +6,11 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
-
-	"github.com/subsonic74/virtmapper/virtmap"
 )
 
 var tests = map[string]struct {
 	Resp  *http.Response
-	Vmap  virtmap.Vmap
+	Vmap  Vmap
 	Error error
 }{
 	"http://TESTHOST/api/v1/kvm09": {
@@ -32,11 +30,11 @@ var tests = map[string]struct {
 	"guests": null
 }`)),
 		},
-		virtmap.Vmap{
-			map[string]virtmap.VHost{
-				"kvm09": virtmap.VHost{"up", []string{"olh", "tam"}},
+		Vmap{
+			map[string]VHost{
+				"kvm09": VHost{"up", []string{"olh", "tam"}},
 			},
-			map[string]virtmap.VGuest(nil),
+			map[string]VGuest(nil),
 		},
 		nil,
 	},
@@ -55,10 +53,10 @@ var tests = map[string]struct {
 	}
 }`)),
 		},
-		virtmap.Vmap{
-			map[string]virtmap.VHost(nil),
-			map[string]virtmap.VGuest{
-				"tam": virtmap.VGuest{"running", "kvm09"},
+		Vmap{
+			map[string]VHost(nil),
+			map[string]VGuest{
+				"tam": VGuest{"running", "kvm09"},
 			},
 		},
 		nil,
@@ -90,13 +88,13 @@ var tests = map[string]struct {
 	}
 }`)),
 		},
-		virtmap.Vmap{
-			map[string]virtmap.VHost{
-				"kvm09": virtmap.VHost{"up", []string{"olh", "tam"}},
+		Vmap{
+			map[string]VHost{
+				"kvm09": VHost{"up", []string{"olh", "tam"}},
 			},
-			map[string]virtmap.VGuest{
-				"olh": virtmap.VGuest{"running", "kvm09"},
-				"tam": virtmap.VGuest{"paused", "kvm09"},
+			map[string]VGuest{
+				"olh": VGuest{"running", "kvm09"},
+				"tam": VGuest{"paused", "kvm09"},
 			},
 		},
 		nil,

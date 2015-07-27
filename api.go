@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/subsonic74/virtmapper/virtmap"
 )
 
 const api_prefix = "/api/v1"
@@ -52,7 +50,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func Reloader() {
-	var vmap virtmap.Vmap
+	var vmap Vmap
 	for ;; {
 		log.Printf("Reloading from %s\n", virsh_file)
 		err := vmap.Load(virsh_file)
