@@ -12,7 +12,7 @@ var HTTPGetter = func(url string) (*http.Response, error) {
 	return http.Get(url)
 }
 
-func Query(query string) (Vmap, error) {
+func Query(httpServer string, query string) (Vmap, error) {
 	response, err := HTTPGetter("http://" + httpServer + "/api/v1/" + query)
 	if err != nil {
 		fmt.Printf("Get() error, %v\n", err)

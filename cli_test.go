@@ -102,7 +102,6 @@ var tests = map[string]struct {
 }
 
 func TestQuery(t *testing.T) {
-	httpServer = "TESTHOST"
 	apiPath := "http://TESTHOST/api/v1/"
 
 	HTTPGetter = func(url string) (*http.Response, error) {
@@ -115,7 +114,7 @@ func TestQuery(t *testing.T) {
 
 	for req, test := range tests {
 		req = req[len(apiPath):]
-		resp, err := Query(req)
+		resp, err := Query("TESTHOST", req)
 		if err != test.Error {
 			t.Fatalf("Query() returned the wrong error\nGot:\n%v\nExpected:\n%v", err, test.Error)
 		}

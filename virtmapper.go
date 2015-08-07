@@ -1,31 +1,26 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"sync"
-	"time"
+
+	"github.com/codegangsta/cli"
 )
 
-const Version = "0.0.2"
-const virsh_file = "/tmp/virsh.txt"
+const Version = "0.0.3"
+const APIVersion = "v1"
+const virshFile = "/tmp/virsh.txt"
 
+// SafeVmp is a mutex-protected vmap struct
 type SafeVmap struct {
 	vmap   Vmap
 	rwlock sync.RWMutex
 }
 
+// Global vmap which is used for queries
+// and set by the Reloader function
 var safeVmap SafeVmap
-
-const refresh_rate = 60 * time.Minute
-
-var (
-	httpAddr     string
-	httpServer   string
-	query        string
-	printVersion bool
-)
 
 func (s *SafeVmap) Get() Vmap {
 	s.rwlock.RLock()
@@ -39,37 +34,61 @@ func (s *SafeVmap) Set(v Vmap) {
 	s.vmap = v
 }
 
-func init() {
-	flag.StringVar(&httpAddr, "http", "", "HTTP service address (e.g., ':6060')")
-	flag.StringVar(&httpServer, "server", "", "HTTP server to query (e.g., 'server.example.com:6060')")
-	flag.StringVar(&query, "query", "", "Host to query about, omit for all hosts")
-	flag.BoolVar(&printVersion, "version", false, "print version and exit")
-}
-
 func main() {
-	flag.Parse()
-
-	if printVersion {
-		fmt.Printf("virtmapper %s\n", Version)
-		os.Exit(0)
+	app := cli.NewApp()
+	app.Name = "virtmapper"
+	app.Usage = "maps virtual guests to their hosts"
+	app.Version = "0.0.3"
+	cli.AppHelpTemplate = VirtmapperHelpTemplate
+	app.Action = func(c *cli.Context) {
+		cli.ShowAppHelp(c)
 	}
 
-	if httpAddr != "" && httpServer != "" {
-		fmt.Println("Please specify either -server or -http, not both")
-		os.Exit(1)
+	app.Commands = []cli.Command{
+		{
+			Name: "serve",
+			Aliases: []string{"s"},
+			Usage: "run the server and accept map queries",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name: "address, a",
+					Value: ":7474",
+					Usage: "address and port to listen on",
+				},
+				cli.IntFlag{
+					Name: "reload, r",
+					Value: 60,
+					Usage: "map refresh interval in minutes",
+				},
+			},
+			Action: func(c *cli.Context) {
+				println("Serve")
+				go Reloader(c.Int("reload"))
+				Serve(c.String("address"))
+			},
+		},
+		{
+			Name: "query",
+			Aliases: []string{"q"},
+			Usage: "query a server with the given request",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name: "server, s",
+					Value: "manager.corp.airwave.com:7474",
+					Usage: "address of server to query",
+				},
+			},
+			Action: func(c *cli.Context) {
+				println("Query")
+				result, err := Query(c.String("server"), c.Args().Get(0))
+				if err != nil {
+					fmt.Printf("Error, %v", err)
+					os.Exit(1)
+				}
+				Display(result)
+			},			
+		},
 	}
-
-	if httpAddr != "" {
-		go Reloader()
-		Serve()
-	}
-
-	if httpServer != "" {
-		result, err := Query(query)
-		if err != nil {
-			fmt.Printf("Error, %v", err)
-			os.Exit(1)
-		}
-		Display(result)
-	}
+  
+	app.Run(os.Args)
 }

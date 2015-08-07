@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-const api_prefix = "/api/v1"
+var apiPrefix = "/api/" + APIVersion
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-	if len(r.URL.Path) < len(api_prefix) {
+	if len(r.URL.Path) < len(apiPrefix) {
 		log.Printf("Bad request URL: %s", r.URL.Path)
 		http.Error(w, `{"error": "Bad request URL"}`, http.StatusNotFound)
 		return
 	}
-	node := strings.TrimLeft(r.URL.Path[len(api_prefix):], "/")
+	node := strings.TrimLeft(r.URL.Path[len(apiPrefix):], "/")
 
 	var encoded []byte
 	var err error
@@ -49,21 +49,22 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
-func Reloader() {
+// Reload and parse the virshFile periodically (runs as a goroutine)
+func Reloader(refresh int) {
 	var vmap Vmap
 	for ;; {
-		log.Printf("Reloading from %s\n", virsh_file)
-		err := vmap.Load(virsh_file)
+		err := vmap.Load(virshFile)
 		if err != nil {
 			log.Printf("Problem getting vmap: %s", err.Error())
 		}
 		safeVmap.Set(vmap)
-		time.Sleep(refresh_rate)
+		log.Printf("Reloaded from %s, %d entries in map.\n", virshFile, vmap.Length())
+		time.Sleep(time.Duration(refresh) * time.Minute)
 	}
 }
 
-func Serve() {
+func Serve(address string) {
 	http.HandleFunc("/api/v1/", handleRequest)
-	log.Println("Starting")
-	log.Fatal(http.ListenAndServe(httpAddr, nil))
+	log.Println("Starting server, listening on", address)
+	log.Fatal(http.ListenAndServe(address, nil))
 }
