@@ -52,7 +52,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 // Reloads and parses the virshFile periodically (runs as a goroutine)
 func Reloader(virshFile string, refresh int) {
 	var vmap Vmap
-	for ;; {
+	for {
 		err := vmap.Load(virshFile)
 		if err != nil {
 			log.Printf("Problem getting vmap: %s", err.Error())

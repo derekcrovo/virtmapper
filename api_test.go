@@ -12,23 +12,23 @@ import (
 
 func TestHandleRequest(t *testing.T) {
 	log.SetOutput(ioutil.Discard)
-    vmap := Vmap{
-        map[string]VHost{
-            "kvm09": VHost{"up", []string{"olh", "tam"}},
-            "kvm43": VHost{"up", []string{"compute-64"}},
-            "kvm30": VHost{"down", []string(nil)},
-            "kvm59": VHost{"up", []string(nil)},
-        },
-        map[string]VGuest{
-            "tam":        VGuest{"running", "kvm09"},
-            "olh":        VGuest{"shut", "kvm09"},
-            "compute-64": VGuest{"paused", "kvm43"},
-        },
-    }
+	vmap := Vmap{
+		map[string]VHost{
+			"kvm09": VHost{"up", []string{"olh", "tam"}},
+			"kvm43": VHost{"up", []string{"compute-64"}},
+			"kvm30": VHost{"down", []string(nil)},
+			"kvm59": VHost{"up", []string(nil)},
+		},
+		map[string]VGuest{
+			"tam":        VGuest{"running", "kvm09"},
+			"olh":        VGuest{"shut", "kvm09"},
+			"compute-64": VGuest{"paused", "kvm43"},
+		},
+	}
 	full := `{"hosts":{"kvm09":{"state":"up","guests":["olh","tam"]},"kvm30":{"state":"down","guests":null},"kvm43":{"state":"up","guests":["compute-64"]},"kvm59":{"state":"up","guests":null}},"guests":{"compute-64":{"state":"paused","host":"kvm43"},"olh":{"state":"shut","host":"kvm09"},"tam":{"state":"running","host":"kvm09"}}}`
 
 	tests := []struct {
-        empty  bool
+		empty  bool
 		method string
 		req    string
 		code   int
@@ -46,11 +46,11 @@ func TestHandleRequest(t *testing.T) {
 		request, _ := http.NewRequest(test.method, test.req, nil)
 		response := httptest.NewRecorder()
 
-        if test.empty {
-            safeVmap.Set(Vmap{})
-        } else {
-            safeVmap.Set(vmap)
-        }
+		if test.empty {
+			safeVmap.Set(Vmap{})
+		} else {
+			safeVmap.Set(vmap)
+		}
 		handleRequest(response, request)
 
 		if response.Code != test.code {
