@@ -18,7 +18,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	node := strings.TrimLeft(r.URL.Path[len(apiPrefix):], "/")
-	log.Println("node", node)
 	var encoded []byte
 	var err error
 
