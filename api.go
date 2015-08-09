@@ -8,8 +8,9 @@ import (
 	"time"
 )
 
-var apiPrefix = "/api/" + APIVersion
+var apiPrefix = "/api/" + APIVersion + "/"
 
+// The HTTP handler for the API.  Returns results in JSON format.
 func handleRequest(w http.ResponseWriter, r *http.Request) {
 	if len(r.URL.Path) < len(apiPrefix) {
 		log.Printf("Bad request URL: %s", r.URL.Path)
@@ -17,7 +18,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	node := strings.TrimLeft(r.URL.Path[len(apiPrefix):], "/")
-
+	log.Println("node", node)
 	var encoded []byte
 	var err error
 
@@ -49,8 +50,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
-// Reload and parse the virshFile periodically (runs as a goroutine)
-func Reloader(refresh int) {
+// Reloads and parses the virshFile periodically (runs as a goroutine)
+func Reloader(virshFile string, refresh int) {
 	var vmap Vmap
 	for ;; {
 		err := vmap.Load(virshFile)
@@ -63,8 +64,9 @@ func Reloader(refresh int) {
 	}
 }
 
+// Registers the HTTP handler and runs the server.
 func Serve(address string) {
-	http.HandleFunc("/api/v1/", handleRequest)
+	http.HandleFunc(apiPrefix, handleRequest)
 	log.Println("Starting server, listening on", address)
 	log.Fatal(http.ListenAndServe(address, nil))
 }

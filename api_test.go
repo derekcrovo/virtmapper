@@ -3,12 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestHandleRequest(t *testing.T) {
+	log.SetOutput(ioutil.Discard)
     vmap := Vmap{
         map[string]VHost{
             "kvm09": VHost{"up", []string{"olh", "tam"}},
@@ -36,7 +39,6 @@ func TestHandleRequest(t *testing.T) {
 		{false, "GET", "/api/v1/kvm09", http.StatusOK, `{"hosts":{"kvm09":{"state":"up","guests":["olh","tam"]}},"guests":null}`},
 		{false, "GET", "/api/v1/olh", http.StatusOK, `{"hosts":null,"guests":{"olh":{"state":"shut","host":"kvm09"}}}`},
 		{false, "GET", "/api/v1/", http.StatusOK, full},
-		{false, "GET", "/api/v1", http.StatusOK, full},
 		{true, "GET", "/api/v1/olh", http.StatusInternalServerError, `{"error":"Data source error"}`},
 	}
 	buffer := new(bytes.Buffer)
@@ -52,7 +54,7 @@ func TestHandleRequest(t *testing.T) {
 		handleRequest(response, request)
 
 		if response.Code != test.code {
-			t.Fatalf("Unexpected status code %d. Expected: %d", response.Code, test.code)
+			t.Fatalf("Unexpected status code %d. Expected: %d for request %s", response.Code, test.code, test.req)
 		}
 		err := json.Compact(buffer, response.Body.Bytes())
 		if err != nil {

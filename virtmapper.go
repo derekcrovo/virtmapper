@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"sync"
 
@@ -10,7 +11,6 @@ import (
 
 const Version = "0.0.3"
 const APIVersion = "v1"
-const virshFile = "/tmp/virsh.txt"
 
 // SafeVmp is a mutex-protected vmap struct
 type SafeVmap struct {
@@ -55,15 +55,31 @@ func main() {
 					Value: ":7474",
 					Usage: "address and port to listen on",
 				},
+				cli.StringFlag{
+					Name: "logfile, l",
+					Value: "/var/log/virtmapper",
+					Usage: "log file for server activity",
+				},
 				cli.IntFlag{
 					Name: "reload, r",
 					Value: 60,
 					Usage: "map refresh interval in minutes",
 				},
+				cli.StringFlag{
+					Name: "virshfile, v",
+					Value: "/tmp/virsh.txt",
+					Usage: "path to virsh dump file to read",
+				},
 			},
 			Action: func(c *cli.Context) {
-				println("Serve")
-				go Reloader(c.Int("reload"))
+				f, err := os.OpenFile(c.String("logfile"), os.O_WRONLY | os.O_CREATE | os.O_APPEND, 0644)
+				if err != nil {
+			    	fmt.Printf("Error opening file: %v\n", err)
+    				os.Exit(1)
+				}
+				defer f.Close()
+				log.SetOutput(f)
+				go Reloader(c.String("virshfile"),c.Int("reload"))
 				Serve(c.String("address"))
 			},
 		},
@@ -79,10 +95,8 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) {
-				println("Query")
 				result, err := Query(c.String("server"), c.Args().Get(0))
 				if err != nil {
-					fmt.Printf("Error, %v", err)
 					os.Exit(1)
 				}
 				Display(result)

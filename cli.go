@@ -8,10 +8,13 @@ import (
 	"net/http"
 )
 
+// Helper func for http.Get(), factored out so it can be a hook for testing.
 var HTTPGetter = func(url string) (*http.Response, error) {
 	return http.Get(url)
 }
 
+// The main CLI client code.  Queries the given server for the given host,
+// unmarshalls the JSON, and returns a result Vmap.
 func Query(httpServer string, query string) (Vmap, error) {
 	response, err := HTTPGetter("http://" + httpServer + "/api/v1/" + query)
 	if err != nil {
@@ -29,7 +32,7 @@ func Query(httpServer string, query string) (Vmap, error) {
 	var genericReply map[string]interface{}
 	err = json.Unmarshal(body, &genericReply)
 	if err != nil {
-		fmt.Printf("JSON Unmarshalling error: %v", err)
+		fmt.Printf("JSON Unmarshalling error: %v\n", err)
 		return Vmap{}, err
 	}
 
@@ -46,6 +49,7 @@ func Query(httpServer string, query string) (Vmap, error) {
 	return vmap, nil
 }
 
+// Takes a result Vmap from Query() and displays it to the user.
 func Display(vmap Vmap) {
 	for n, _ := range vmap.Hosts {
 		fmt.Println(vmap.Info(n))

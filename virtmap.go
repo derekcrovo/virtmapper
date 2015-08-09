@@ -9,25 +9,34 @@ import (
 	"strings"
 )
 
+// Structure for a virtual host which contains several virtual guests.
+// State may be "up" or "down".
 type VHost struct {
 	State  string   `json:"state"`
 	Guests []string `json:"guests"`
 }
 
+// Structure for a virtual guest. Includes the name of its virtual host.
+// State may be "running", "paused", or "shut" (shut down) as reported by "virsh list".
 type VGuest struct {
 	State string `json:"state"`
 	Host  string `json:"host"`
 }
 
+// The main virtual map. Contains a map of guests and
+// a map of hosts to support queries in either direction.
 type Vmap struct {
 	Hosts  map[string]VHost  `json:"hosts"`
 	Guests map[string]VGuest `json:"guests"`
 }
 
+// Returns the total number of hosts in the map.
 func (v Vmap) Length() int {
 	return len(v.Hosts) + len(v.Guests)
 }
 
+// Parses the output of an Ansible run of "virsh list --all"
+// over all the virtual hosts.
 func (v *Vmap) ParseVirsh(virshOutput []byte) {
 	v.Hosts = make(map[string]VHost)
 	v.Guests = make(map[string]VGuest)
@@ -64,6 +73,7 @@ func (v *Vmap) ParseVirsh(virshOutput []byte) {
 	}
 }
 
+// Loads the virsh output file and parses it into the Vmap.
 func (v *Vmap) Load(virshFilename string) error {
 	raw, err := ioutil.ReadFile(virshFilename)
 	if err != nil {
@@ -73,6 +83,8 @@ func (v *Vmap) Load(virshFilename string) error {
 	return nil
 }
 
+// Gets a host from the map. The target host may be
+// a virtual host or a virtual guest.
 func (v Vmap) Get(target string) (Vmap, error) {
 	var result Vmap
 	found := false
@@ -96,6 +108,8 @@ func (v Vmap) Get(target string) (Vmap, error) {
 	return result, nil
 }
 
+// Returns a friendly text string describing the target host.
+// Used in user cli queries.
 func (v Vmap) Info(target string) string {
 	result, err := v.Get(target)
 	if err != nil {
