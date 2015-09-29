@@ -14,8 +14,8 @@ const APIVersion = "v1"
 
 // SafeVmp is a mutex-protected vmap struct
 type SafeVmap struct {
+	sync.Mutex
 	vmap   Vmap
-	rwlock sync.RWMutex
 }
 
 // Global vmap which is used for queries
@@ -23,14 +23,14 @@ type SafeVmap struct {
 var safeVmap SafeVmap
 
 func (s *SafeVmap) Get() Vmap {
-	s.rwlock.RLock()
-	defer s.rwlock.RUnlock()
+	s.Lock()
+	defer s.Unlock()
 	return s.vmap
 }
 
 func (s *SafeVmap) Set(v Vmap) {
-	s.rwlock.Lock()
-	defer s.rwlock.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	s.vmap = v
 }
 
