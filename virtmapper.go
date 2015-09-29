@@ -15,7 +15,7 @@ const APIVersion = "v1"
 // SafeVmp is a mutex-protected vmap struct
 type SafeVmap struct {
 	sync.Mutex
-	vmap   Vmap
+	vmap Vmap
 }
 
 // Global vmap which is used for queries
