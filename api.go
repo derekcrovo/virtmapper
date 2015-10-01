@@ -10,8 +10,12 @@ import (
 
 var apiPrefix = "/api/" + APIVersion + "/"
 
+type vmapHandler struct {
+	mapCh chan *Vmap
+}
+
 // The HTTP handler for the API.  Returns results in JSON format.
-func handleRequest(w http.ResponseWriter, r *http.Request) {
+func (v vmapHandler) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if len(r.URL.Path) < len(apiPrefix) {
 		log.Printf("Bad request URL: %s", r.URL.Path)
 		http.Error(w, `{"error": "Bad request URL"}`, http.StatusNotFound)
@@ -21,7 +25,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	var encoded []byte
 	var err error
 
-	vmap := safeVmap.Get()
+	vmap := <-v.mapCh
 	if vmap.Length() == 0 {
 		log.Printf("Vmap empty!")
 		http.Error(w, `{"error": "Data source error"}`, http.StatusInternalServerError)
@@ -49,23 +53,34 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
-// Reloads and parses the virshFile periodically (runs as a goroutine)
-func Reloader(virshFile string, refresh int) {
-	var vmap Vmap
-	for {
-		err := vmap.Load(virshFile)
-		if err != nil {
-			log.Printf("Problem getting vmap: %s", err.Error())
-		}
-		safeVmap.Set(vmap)
-		log.Printf("Reloaded from %s, %d entries in map.\n", virshFile, vmap.Length())
-		time.Sleep(time.Duration(refresh) * time.Minute)
-	}
-}
-
 // Registers the HTTP handler and runs the server.
-func Serve(address string) {
-	http.HandleFunc(apiPrefix, handleRequest)
+func (v vmapHandler) Serve(address string) {
+	http.HandleFunc(apiPrefix, v.handleRequest)
 	log.Println("Starting server, listening on", address)
 	log.Fatal(http.ListenAndServe(address, nil))
+}
+
+// Reloads and parses the virshFile periodically
+func Reloader(done <-chan struct{}, virshFile string, refresh int) chan *Vmap {
+	var vmap *Vmap
+	var delay time.Duration
+	mapCh := make(chan *Vmap)
+	go func() {
+		for {
+			select {
+			case <-time.After(delay):
+				err := vmap.Load(virshFile)
+				if err != nil {
+					log.Printf("Problem getting vmap: %s", err.Error())
+				}
+				log.Printf("Reloaded from %s, %d entries in map.\n", virshFile, vmap.Length())
+				delay = time.Duration(refresh) * time.Minute
+			case mapCh <- vmap:
+			case <-done:
+				log.Println("Reloader shutting down.")
+				return
+			}
+		}
+	}()
+	return mapCh
 }

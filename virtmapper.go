@@ -4,35 +4,12 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 
 	"github.com/codegangsta/cli"
 )
 
 const Version = "0.0.3"
 const APIVersion = "v1"
-
-// SafeVmp is a mutex-protected vmap struct
-type SafeVmap struct {
-	sync.Mutex
-	vmap Vmap
-}
-
-// Global vmap which is used for queries
-// and set by the Reloader function
-var safeVmap SafeVmap
-
-func (s *SafeVmap) Get() Vmap {
-	s.Lock()
-	defer s.Unlock()
-	return s.vmap
-}
-
-func (s *SafeVmap) Set(v Vmap) {
-	s.Lock()
-	defer s.Unlock()
-	s.vmap = v
-}
 
 func main() {
 	app := cli.NewApp()
@@ -79,8 +56,10 @@ func main() {
 				}
 				defer f.Close()
 				log.SetOutput(f)
-				go Reloader(c.String("virshfile"), c.Int("reload"))
-				Serve(c.String("address"))
+				done := make(chan struct{})
+				defer close(done)
+				v := vmapHandler{Reloader(done, c.String("virshfile"), c.Int("reload"))}
+				v.Serve(c.String("address"))
 			},
 		},
 		{

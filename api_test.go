@@ -12,7 +12,7 @@ import (
 
 func TestHandleRequest(t *testing.T) {
 	log.SetOutput(ioutil.Discard)
-	vmap := Vmap{
+	vmap := &Vmap{
 		map[string]VHost{
 			"kvm09": VHost{"up", []string{"olh", "tam"}},
 			"kvm43": VHost{"up", []string{"compute-64"}},
@@ -28,30 +28,31 @@ func TestHandleRequest(t *testing.T) {
 	full := `{"hosts":{"kvm09":{"state":"up","guests":["olh","tam"]},"kvm30":{"state":"down","guests":null},"kvm43":{"state":"up","guests":["compute-64"]},"kvm59":{"state":"up","guests":null}},"guests":{"compute-64":{"state":"paused","host":"kvm43"},"olh":{"state":"shut","host":"kvm09"},"tam":{"state":"running","host":"kvm09"}}}`
 
 	tests := []struct {
-		empty  bool
-		method string
-		req    string
-		code   int
-		body   string
+		testmap *Vmap
+		method  string
+		req     string
+		code    int
+		body    string
 	}{
-		{false, "GET", "/kvm09", http.StatusNotFound, `{"error":"Bad request URL"}`},
-		{false, "GET", "/api/v1/missingnode", http.StatusOK, `{"error":"Node missingnode not found"}`},
-		{false, "GET", "/api/v1/kvm09", http.StatusOK, `{"hosts":{"kvm09":{"state":"up","guests":["olh","tam"]}},"guests":null}`},
-		{false, "GET", "/api/v1/olh", http.StatusOK, `{"hosts":null,"guests":{"olh":{"state":"shut","host":"kvm09"}}}`},
-		{false, "GET", "/api/v1/", http.StatusOK, full},
-		{true, "GET", "/api/v1/olh", http.StatusInternalServerError, `{"error":"Data source error"}`},
+		{nil, "GET", "/kvm09", http.StatusNotFound, `{"error":"Bad request URL"}`},
+		{vmap, "GET", "/api/v1/missingnode", http.StatusOK, `{"error":"Node missingnode not found"}`},
+		{vmap, "GET", "/api/v1/kvm09", http.StatusOK, `{"hosts":{"kvm09":{"state":"up","guests":["olh","tam"]}},"guests":null}`},
+		{vmap, "GET", "/api/v1/olh", http.StatusOK, `{"hosts":null,"guests":{"olh":{"state":"shut","host":"kvm09"}}}`},
+		{vmap, "GET", "/api/v1/", http.StatusOK, full},
+		{&Vmap{}, "GET", "/api/v1/olh", http.StatusInternalServerError, `{"error":"Data source error"}`},
 	}
 	buffer := new(bytes.Buffer)
+	mapCh := make(chan *Vmap, 1)
+	v := vmapHandler{mapCh}
 	for _, test := range tests {
 		request, _ := http.NewRequest(test.method, test.req, nil)
 		response := httptest.NewRecorder()
 
-		if test.empty {
-			safeVmap.Set(Vmap{})
-		} else {
-			safeVmap.Set(vmap)
+		if test.testmap != nil {
+			mapCh <- test.testmap
 		}
-		handleRequest(response, request)
+
+		v.handleRequest(response, request)
 
 		if response.Code != test.code {
 			t.Fatalf("Unexpected status code %d. Expected: %d for request %s", response.Code, test.code, test.req)
