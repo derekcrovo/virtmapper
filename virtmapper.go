@@ -56,9 +56,7 @@ func main() {
 				}
 				defer f.Close()
 				log.SetOutput(f)
-				done := make(chan struct{})
-				defer close(done)
-				v := vmapHandler{Reloader(done, c.String("virshfile"), c.Int("reload"))}
+				v := vmapHandler{Reloader(c.String("virshfile"), c.Int("reload"))}
 				v.Serve(c.String("address"))
 			},
 		},

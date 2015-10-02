@@ -27,7 +27,7 @@ func (v vmapHandler) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	vmap := <-v.mapCh
 	if vmap.Length() == 0 {
-		log.Printf("Vmap empty!")
+		log.Printf("Vmap is empty")
 		http.Error(w, `{"error": "Data source error"}`, http.StatusInternalServerError)
 		return
 	}
@@ -61,14 +61,15 @@ func (v vmapHandler) Serve(address string) {
 }
 
 // Reloads and parses the virshFile periodically
-func Reloader(done <-chan struct{}, virshFile string, refresh int) chan *Vmap {
-	var vmap *Vmap
+func Reloader(virshFile string, refresh int) chan *Vmap {
+	vmap := new(Vmap)
 	var delay time.Duration
 	mapCh := make(chan *Vmap)
 	go func() {
 		for {
 			select {
 			case <-time.After(delay):
+				vmap = new(Vmap)
 				err := vmap.Load(virshFile)
 				if err != nil {
 					log.Printf("Problem getting vmap: %s", err.Error())
@@ -76,9 +77,6 @@ func Reloader(done <-chan struct{}, virshFile string, refresh int) chan *Vmap {
 				log.Printf("Reloaded from %s, %d entries in map.\n", virshFile, vmap.Length())
 				delay = time.Duration(refresh) * time.Minute
 			case mapCh <- vmap:
-			case <-done:
-				log.Println("Reloader shutting down.")
-				return
 			}
 		}
 	}()
