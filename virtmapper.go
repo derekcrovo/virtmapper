@@ -5,17 +5,32 @@ import (
 	"log"
 	"os"
 
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
-const Version = "0.0.3"
-const APIVersion = "v1"
+// version constants
+const (
+	version    = "0.0.3"
+	apiVersion = "v1"
+)
+
+// Configuration defaults
+const (
+	listenAddress     = ":7474"
+	logFile           = "/var/log/virtmapper"
+	refreshInterval   = 60 // Minutes
+	ansibleOutputFile = "/tmp/virsh.txt"
+)
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "virtmapper"
-	app.Usage = "maps virtual guests to their hosts"
-	app.Version = "0.0.3"
+	app.Usage = "maps libvirt virtual guests to their hosts"
+	app.Authors = []cli.Author{cli.Author{
+		Name:  "Derek Crovo",
+		Email: "dcrovo@gmail.com",
+	}}
+	app.Version = version
 	cli.AppHelpTemplate = VirtmapperHelpTemplate
 	app.Action = func(c *cli.Context) {
 		cli.ShowAppHelp(c)
@@ -29,23 +44,23 @@ func main() {
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "address, a",
-					Value: ":7474",
+					Value: listenAddress,
 					Usage: "address and port to listen on",
 				},
 				cli.StringFlag{
 					Name:  "logfile, l",
-					Value: "/var/log/virtmapper",
+					Value: logFile,
 					Usage: "log file for server activity",
 				},
 				cli.IntFlag{
-					Name:  "reload, r",
-					Value: 60,
+					Name:  "refreshInterval, r",
+					Value: refreshInterval,
 					Usage: "map refresh interval in minutes",
 				},
 				cli.StringFlag{
-					Name:  "virshfile, v",
-					Value: "/tmp/virsh.txt",
-					Usage: "path to virsh dump file to read",
+					Name:  "ansibleOutputFile, v",
+					Value: ansibleOutputFile,
+					Usage: "path to Ansible output file to read",
 				},
 			},
 			Action: func(c *cli.Context) {
@@ -56,7 +71,7 @@ func main() {
 				}
 				defer f.Close()
 				log.SetOutput(f)
-				v := vmapHandler{Reloader(c.String("virshfile"), c.Int("reload"))}
+				v := server{Reloader(c.String("ansibleOutputFile"), c.Int("refreshInterval"))}
 				v.Serve(c.String("address"))
 			},
 		},
@@ -66,8 +81,8 @@ func main() {
 			Usage:   "query a server with the given request",
 			Flags: []cli.Flag{
 				cli.StringFlag{
-					Name:  "server, s",
-					Value: "manager.corp.airwave.com:7474",
+					Name: "server, s",
+					// Value: "manager.corp.airwave.com:7474",
 					Usage: "address of server to query",
 				},
 			},

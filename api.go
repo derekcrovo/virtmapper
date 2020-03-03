@@ -2,65 +2,85 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 )
 
-var apiPrefix = "/api/" + APIVersion + "/"
+const apiPrefix = "/api/" + apiVersion + "/"
 
-type vmapHandler struct {
+type server struct {
 	mapCh chan *Vmap
 }
 
 // The HTTP handler for the API.  Returns results in JSON format.
-func (v vmapHandler) handleRequest(w http.ResponseWriter, r *http.Request) {
+func (s server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if len(r.URL.Path) < len(apiPrefix) {
-		log.Printf("Bad request URL: %s", r.URL.Path)
-		http.Error(w, `{"error": "Bad request URL"}`, http.StatusNotFound)
+		err := fmt.Errorf("Bad request URL: %s", r.URL.Path)
+		log.Println(err)
+		s.responderr(w, r, http.StatusNotFound, err)
 		return
 	}
 	node := strings.TrimLeft(r.URL.Path[len(apiPrefix):], "/")
-	var encoded []byte
-	var err error
-
-	vmap := <-v.mapCh
+	vmap := <-s.mapCh
 	if vmap.Length() == 0 {
 		log.Printf("Vmap is empty")
-		http.Error(w, `{"error": "Data source error"}`, http.StatusInternalServerError)
-		return
 	}
+	var response Vmap
 	if node == "" {
 		log.Printf("Request for entire map, virtmap: %d nodes", vmap.Length())
-		encoded, err = json.MarshalIndent(vmap, " ", "  ")
+		response = *vmap
 	} else {
 		log.Printf("Request for %s, virtmap: %d nodes", node, vmap.Length())
-		response, err := vmap.Get(node)
+		var err error
+		response, err = vmap.Get(node)
+		if err == errNodeNotFound {
+			s.responderr(w, r, http.StatusNotFound, fmt.Errorf("Node %s not found", node))
+			return
+		}
 		if err != nil {
-			encoded = []byte(`{"error": "Node ` + node + ` not found"}`)
-		} else {
-			encoded, err = json.MarshalIndent(response, " ", "  ")
+			s.responderr(w, r, http.StatusInternalServerError, err)
+			return
 		}
 	}
-	if err != nil {
-		http.Error(w, `{"error": "`+err.Error()+`"}"`, http.StatusInternalServerError)
-		return
-	}
+	s.respond(w, r, http.StatusOK, response)
+}
 
-	w.Header().Set("Server", "Virtmapper 0.0.3")
+func (s server) respond(w http.ResponseWriter, r *http.Request, status int, data interface{}) {
+	w.Header().Set("Server", "Virtmapper v"+version)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(encoded)
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("encode response: %s", err)
+	}
+}
+
+func (s server) responderr(w http.ResponseWriter, r *http.Request, status int, err error) {
+	w.Header().Set("Server", "Virtmapper v"+version)
+	w.WriteHeader(status)
+	var data struct {
+		Error string `json:"error"`
+	}
+	if err != nil {
+		data.Error = err.Error()
+	} else {
+		data.Error = "Something went wrong"
+	}
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("encode response: %s", err)
+	}
 }
 
 // Registers the HTTP handler and runs the server.
-func (v vmapHandler) Serve(address string) {
-	http.HandleFunc(apiPrefix, v.handleRequest)
+func (s server) Serve(address string) {
+	http.HandleFunc(apiPrefix, s.handleRequest)
 	log.Println("Starting server, listening on", address)
 	log.Fatal(http.ListenAndServe(address, nil))
 }
 
-// Reloads and parses the virshFile periodically
+// Reloader launches a goroutine which reloads and parses the virshFile periodically
 func Reloader(virshFile string, refresh int) chan *Vmap {
 	vmap := new(Vmap)
 	var delay time.Duration
@@ -69,7 +89,7 @@ func Reloader(virshFile string, refresh int) chan *Vmap {
 		for {
 			select {
 			case <-time.After(delay):
-				vmap = new(Vmap)
+				vmap = &Vmap{}
 				err := vmap.Load(virshFile)
 				if err != nil {
 					log.Printf("Problem getting vmap: %s", err.Error())

@@ -1,5 +1,6 @@
 package main
 
+// VirtmapperHelpTemplate is the CLI help text template
 var VirtmapperHelpTemplate = `NAME:
    {{.Name}} - {{.Usage}}
 
@@ -10,7 +11,7 @@ VERSION:
    {{.Version}}
 
 API VERSION:
-   ` + APIVersion + `{{if len .Authors}}
+   ` + apiVersion + `{{if len .Authors}}
 
 AUTHOR(S): 
    {{range .Authors}}{{ . }}{{end}}{{end}}

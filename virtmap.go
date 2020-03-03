@@ -9,34 +9,37 @@ import (
 	"strings"
 )
 
-// Structure for a virtual host which contains several virtual guests.
-// State may be "up" or "down".
+// errNodeNotFound is returned when the requested host is not present in the vmap
+var errNodeNotFound = errors.New("Node not found")
+
+// VHost is a virtual host which contains several virtual guests
+// State may be "up" or "down"
 type VHost struct {
 	State  string   `json:"state"`
 	Guests []string `json:"guests"`
 }
 
-// Structure for a virtual guest. Includes the name of its virtual host.
-// State may be "running", "paused", or "shut" (shut down) as reported by "virsh list".
+// VGuest is a virtual guest. Includes the name of its virtual host
+// State may be "running", "paused", or "shut" (i.e. shut down) as reported by "virsh list"
 type VGuest struct {
 	State string `json:"state"`
 	Host  string `json:"host"`
 }
 
-// The main virtual map. Contains a map of guests and
+// Vmap is the main virtual map.  It contains a map of guests and
 // a map of hosts to support queries in either direction.
 type Vmap struct {
 	Hosts  map[string]VHost  `json:"hosts"`
 	Guests map[string]VGuest `json:"guests"`
 }
 
-// Returns the total number of hosts in the map.
+// Length returns the total number of hosts in the map
 func (v Vmap) Length() int {
 	return len(v.Hosts) + len(v.Guests)
 }
 
-// Parses the output of an Ansible run of "virsh list --all"
-// over all the virtual hosts.
+// ParseVirsh parses the output of an Ansible run of
+// "virsh list --all" on all the virtual hosts
 func (v *Vmap) ParseVirsh(virshOutput []byte) {
 	v.Hosts = make(map[string]VHost)
 	v.Guests = make(map[string]VGuest)
@@ -73,7 +76,7 @@ func (v *Vmap) ParseVirsh(virshOutput []byte) {
 	}
 }
 
-// Loads the virsh output file and parses it into the Vmap.
+// Load Loads the Ansible output file and parses it into the Vmap
 func (v *Vmap) Load(virshFilename string) error {
 	raw, err := ioutil.ReadFile(virshFilename)
 	if err != nil {
@@ -83,8 +86,9 @@ func (v *Vmap) Load(virshFilename string) error {
 	return nil
 }
 
-// Gets a host from the map. The target host may be
-// a virtual host or a virtual guest.
+// Get returns a host from the map.  The target host
+// may be a virtual host or a virtual guest.
+// nodeNotFoundErr is returned when the target is not in the map
 func (v Vmap) Get(target string) (Vmap, error) {
 	var result Vmap
 	found := false
@@ -93,6 +97,7 @@ func (v Vmap) Get(target string) (Vmap, error) {
 			result.Hosts = make(map[string]VHost)
 			result.Hosts[n] = h
 			found = true
+			break
 		}
 	}
 	for n, g := range v.Guests {
@@ -100,15 +105,16 @@ func (v Vmap) Get(target string) (Vmap, error) {
 			result.Guests = make(map[string]VGuest)
 			result.Guests[n] = g
 			found = true
+			break
 		}
 	}
 	if !found {
-		return result, errors.New("Node not found")
+		return result, errNodeNotFound
 	}
 	return result, nil
 }
 
-// Returns a friendly text string describing the target host.
+// Info returns a friendly text string describing the target host.
 // Used in user cli queries.
 func (v Vmap) Info(target string) string {
 	result, err := v.Get(target)
