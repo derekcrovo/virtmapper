@@ -9,12 +9,12 @@ import (
 )
 
 var tests = map[string]struct {
-	Resp  *http.Response
+	Resp  http.Response
 	Vmap  Vmap
 	Error error
 }{
-	"http://TESTHOST/api/v1/kvm09": {
-		&http.Response{
+	"http://TESTHOST/api/v1/vmap/kvm09": {
+		Resp: http.Response{
 			StatusCode: http.StatusOK,
 			Body: ioutil.NopCloser(bytes.NewBufferString(`
 {
@@ -30,17 +30,17 @@ var tests = map[string]struct {
 	"guests": null
 }`)),
 		},
-		Vmap{
-			map[string]VHost{
+		Vmap: Vmap{
+			Hosts: map[string]VHost{
 				"kvm09": VHost{"up", []string{"olh", "tam"}},
 			},
-			map[string]VGuest(nil),
+			Guests: map[string]VGuest(nil),
 		},
-		nil,
+		Error: nil,
 	},
 
-	"http://TESTHOST/api/v1/tam": {
-		&http.Response{
+	"http://TESTHOST/api/v1/vmap/tam": {
+		Resp: http.Response{
 			StatusCode: http.StatusOK,
 			Body: ioutil.NopCloser(bytes.NewBufferString(`
 {
@@ -53,17 +53,17 @@ var tests = map[string]struct {
 	}
 }`)),
 		},
-		Vmap{
-			map[string]VHost(nil),
-			map[string]VGuest{
+		Vmap: Vmap{
+			Hosts: map[string]VHost(nil),
+			Guests: map[string]VGuest{
 				"tam": VGuest{"running", "kvm09"},
 			},
 		},
-		nil,
+		Error: nil,
 	},
 
-	"http://TESTHOST/api/v1/": {
-		&http.Response{
+	"http://TESTHOST/api/v1/vmap/": {
+		Resp: http.Response{
 			StatusCode: http.StatusOK,
 			Body: ioutil.NopCloser(bytes.NewBufferString(`
 {
@@ -88,38 +88,40 @@ var tests = map[string]struct {
 	}
 }`)),
 		},
-		Vmap{
-			map[string]VHost{
+		Vmap: Vmap{
+			Hosts: map[string]VHost{
 				"kvm09": VHost{"up", []string{"olh", "tam"}},
 			},
-			map[string]VGuest{
+			Guests: map[string]VGuest{
 				"olh": VGuest{"running", "kvm09"},
 				"tam": VGuest{"paused", "kvm09"},
 			},
 		},
-		nil,
+		Error: nil,
 	},
 }
 
 func TestQuery(t *testing.T) {
-	apiPath := "http://TESTHOST/api/v1/"
+	apiPath := "http://TESTHOST/api/v1/vmap/"
 
 	HTTPGetter = func(url string) (*http.Response, error) {
 		test, found := tests[url]
 		if !found {
-			t.Fatalf("Bad Query() test: %#v", url)
+			t.Fatalf("Bad Query() test: URL %q not found", url)
 		}
-		return test.Resp, test.Error
+		return &test.Resp, test.Error
 	}
 
-	for req, test := range tests {
+	for req, tt := range tests {
 		req = req[len(apiPath):]
-		resp, err := Query("TESTHOST", req)
-		if err != test.Error {
-			t.Fatalf("Query() returned the wrong error\nGot:\n%v\nExpected:\n%v", err, test.Error)
-		}
-		if !reflect.DeepEqual(resp, test.Vmap) {
-			t.Fatalf("Query() returned bad Vmap\nGot:\n%#v\nExpected:\n%#v", resp, test.Vmap)
-		}
+		t.Run(req, func(t *testing.T) {
+			resp, err := Query("TESTHOST", req)
+			if err != tt.Error {
+				t.Fatalf("Query() returned the wrong error\nGot:\n%v\nExpected:\n%v", err, tt.Error)
+			}
+			if !reflect.DeepEqual(resp, &tt.Vmap) {
+				t.Fatalf("Query() returned bad Vmap\nGot:\n%#v\nExpected:\n%#v", resp, tt.Vmap)
+			}
+		})
 	}
 }
