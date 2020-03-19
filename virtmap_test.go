@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var virshOutput = []byte(`kvm21.example.com | FAILED => FAILED: [Errno -2] Name or service not known
+var ansibleOutput = []byte(`kvm21.example.com | FAILED => FAILED: [Errno -2] Name or service not known
 kvm09.example.com | success | rc=0 >>
  Id    Name                           State
 ----------------------------------------------------
@@ -24,86 +24,85 @@ kvm59.example.com | success | rc=0 >>
 
 `)
 
-func TestParseVirsh(t *testing.T) {
-	var vmap Vmap
-	vmap.ParseVirsh(virshOutput)
+func TestParseAnsibleOutput(t *testing.T) {
+	vmap := ParseAnsibleOutput(ansibleOutput)
 	if vmap.Length() == 0 {
-		t.Fatal("ParseVirsh() returned nothing")
+		t.Fatal("ParseAnsibleOutput() returned nothing")
 	}
-	expected := Vmap{
-		map[string]VHost{
+	expected := &Vmap{
+		Hosts: map[string]VHost{
 			"kvm09": VHost{"up", []string{"olh", "tam"}},
 			"kvm43": VHost{"up", []string{"compute-64"}},
 			"kvm30": VHost{"down", []string(nil)},
 			"kvm59": VHost{"up", []string(nil)},
 		},
-		map[string]VGuest{
+		Guests: map[string]VGuest{
 			"tam":        VGuest{"running", "kvm09"},
 			"olh":        VGuest{"shut", "kvm09"},
 			"compute-64": VGuest{"paused", "kvm43"},
 		},
 	}
-	if !reflect.DeepEqual(vmap, Vmap(expected)) {
-		t.Fatalf("ParseVirsh() failed.\nGot:\n%#v\nExpected:\n%#v", vmap, expected)
+	if !reflect.DeepEqual(vmap, expected) {
+		t.Fatalf("ParseAnsibleOutput() failed.\nGot:\n%#v\nExpected:\n%#v", vmap.Hosts, expected.Hosts)
 	}
 }
 
 func TestGet(t *testing.T) {
-	var vmap Vmap
-	vmap.ParseVirsh(virshOutput)
+	vmap := ParseAnsibleOutput(ansibleOutput)
 	tests := []struct {
 		target string
-		result Vmap
+		result *Vmap
 		error  string
 	}{
 		{
 			"kvm43",
-			Vmap{
-				map[string]VHost{"kvm43": VHost{"up", []string{"compute-64"}}},
-				map[string]VGuest(nil),
+			&Vmap{
+				Hosts:  map[string]VHost{"kvm43": VHost{"up", []string{"compute-64"}}},
+				Guests: map[string]VGuest(nil),
 			},
 			"",
 		},
 		{
 			"olh",
-			Vmap{
-				map[string]VHost(nil),
-				map[string]VGuest{"olh": VGuest{"shut", "kvm09"}},
+			&Vmap{
+				Hosts:  map[string]VHost(nil),
+				Guests: map[string]VGuest{"olh": VGuest{"shut", "kvm09"}},
 			},
 			"",
 		},
 		{
 			"nonsuch",
-			Vmap{},
+			nil,
 			"Node not found",
 		},
 		{
 			"kvm59",
-			Vmap{
-				map[string]VHost{"kvm59": VHost{"up", []string(nil)}},
-				map[string]VGuest(nil),
+			&Vmap{
+				Hosts:  map[string]VHost{"kvm59": VHost{"up", []string(nil)}},
+				Guests: map[string]VGuest(nil),
 			},
 			"",
 		},
 	}
 	for _, test := range tests {
-		node, err := vmap.Get(test.target)
-		if test.error != "" {
-			if err.Error() != test.error {
-				t.Fatalf("Get() returned the wrong error\nGot:\n%v\nExpected:\n%v", err, test.error)
+		t.Run(test.target, func(t *testing.T) {
+			node, err := vmap.Get(test.target)
+			if test.error != "" {
+				if err.Error() != test.error {
+					t.Fatalf("Get() returned the wrong error\nGot:\n%v\nExpected:\n%v", err, test.error)
+				}
+			} else if err != nil {
+				t.Fatalf("Get() returned an error unexpectedly: %v", err)
 			}
-		} else if err != nil {
-			t.Fatalf("Get() returned an error unexpectedly: %v", err)
-		}
-		if !reflect.DeepEqual(node, test.result) {
-			t.Fatalf("Get() returned bad node data\nGot:\n%#v\nExpected:\n%#v", node, test.result)
-		}
+			if !reflect.DeepEqual(node, test.result) {
+				t.Fatalf("Get() returned bad node data\nGot:\n%#v\nExpected:\n%#v", node, test.result)
+			}
+		})
 	}
 }
 
 func TestInfo(t *testing.T) {
-	var vmap Vmap
-	vmap.ParseVirsh(virshOutput)
+	vmap := ParseAnsibleOutput(ansibleOutput)
 	tests := []struct {
 		node string
 		info string
@@ -114,12 +113,14 @@ func TestInfo(t *testing.T) {
 		{"kvm59", "kvm59 is a virtual host for guests: "},
 	}
 	for _, test := range tests {
-		returned := vmap.Info(test.node)
-		if returned == "" {
-			t.Fatalf("Info returned nothing for node %s\n", test.node)
-		}
-		if returned != test.info {
-			t.Fatalf("Info() problem\nGot:\n%#v\nExpected:\n%#v", returned, test.info)
-		}
+		t.Run(test.node, func(t *testing.T) {
+			returned := vmap.Info(test.node)
+			if returned == "" {
+				t.Fatalf("Info returned nothing for node %s\n", test.node)
+			}
+			if returned != test.info {
+				t.Fatalf("Info() problem\nGot:\n%#v\nExpected:\n%#v", returned, test.info)
+			}
+		})
 	}
 }
